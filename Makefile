@@ -201,8 +201,9 @@ venv:
 	else \
 		printf "$(BLUE)Creating virtual environment...$(NC)\n"; \
 		$(PYTHON) -m venv $(VENV_DIR); \
+		source $(VENV_DIR)/bin/activate; \
 		printf "$(GREEN)✓ Virtual environment created at $(VENV_DIR)$(NC)\n"; \
-		printf "$(YELLOW)→ Activate with: source $(VENV_DIR)/bin/activate$(NC)\n"; \
+		printf "$(YELLOW)→ Activate if not already done with: source $(VENV_DIR)/bin/activate$(NC)\n"; \
 	fi
 
 install:
