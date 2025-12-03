@@ -59,17 +59,32 @@ jobs:
       - name: Bump version
         id: bump
         run: |
+          # Show current state for debugging
+          echo "Current version in __version__.py:"
+          grep "^__version__" __version__.py || echo "Not found"
+          echo ""
+          echo "Git tags:"
+          git tag --list | tail -5
+          echo ""
+
+          # Run dry-run first to see what would happen
+          echo "Dry-run output:"
+          cz bump --dry-run 2>&1 || true
+          echo ""
+
           # Check if there are commits to bump
           if cz bump --dry-run 2>&1 | grep -q "NO_COMMITS_TO_BUMP"; then
             echo "No version bump needed"
             echo "bumped=false" >> $GITHUB_OUTPUT
           else
             # Perform the actual bump
+            echo "Performing version bump..."
             cz bump --yes --changelog
             echo "bumped=true" >> $GITHUB_OUTPUT
             # Get new version
             NEW_VERSION=$(grep "^__version__" __version__.py | sed 's/.*"\(.*\)"/\1/')
             echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "New version: $NEW_VERSION"
           fi
 
       - name: Push changes
