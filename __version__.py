@@ -70,7 +70,7 @@ See Also:
 
 import re
 
-__version__: str = "0.0.1"
+__version__: str = "0.1.0"
 
 # Validate semantic versioning format (MAJOR.MINOR.PATCH)
 if not re.match(r"^\d+\.\d+\.\d+$", __version__):
