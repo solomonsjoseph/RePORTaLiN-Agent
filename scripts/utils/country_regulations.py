@@ -21,13 +21,13 @@ Example:
 
         # Load regulations for specific countries
         manager = CountryRegulationManager(['US', 'IN'])
-        
+
         # Get all data fields
         fields = manager.get_all_data_fields()
-        
+
         # Get detection patterns
         patterns = manager.get_detection_patterns()
-        
+
         # Export configuration
         manager.export_configuration('regulations.json')
 
@@ -37,33 +37,36 @@ Example:
         supported = manager.get_supported_countries()
 """
 
-import re
+import json
 import logging
-from typing import Dict, List, Optional, Any, Union
+import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-import json
+from typing import Any
 
 __all__ = [
     # Enums
-    'DataFieldType',
-    'PrivacyLevel',
+    "DataFieldType",
+    "PrivacyLevel",
     # Data Classes
-    'DataField',
-    'CountryRegulation',
+    "DataField",
+    "CountryRegulation",
     # Main Manager Class
-    'CountryRegulationManager',
+    "CountryRegulationManager",
     # Helper Function
-    'get_common_fields',
+    "get_common_fields",
 ]
 
 # ============================================================================
 # Enums and Base Classes
 # ============================================================================
 
+
 class DataFieldType(Enum):
     """Data field type categorization."""
+
     PERSONAL_NAME = "personal_name"
     IDENTIFIER = "identifier"
     CONTACT = "contact"
@@ -77,6 +80,7 @@ class DataFieldType(Enum):
 
 class PrivacyLevel(Enum):
     """Privacy sensitivity levels."""
+
     PUBLIC = 1
     LOW = 2
     MEDIUM = 3
@@ -87,17 +91,18 @@ class PrivacyLevel(Enum):
 @dataclass
 class DataField:
     """Data field definition with privacy characteristics."""
+
     name: str
     display_name: str
     field_type: DataFieldType
     privacy_level: PrivacyLevel
     required: bool = False
-    pattern: Optional[str] = None
+    pattern: str | None = None
     description: str = ""
-    examples: List[str] = field(default_factory=list)
+    examples: list[str] = field(default_factory=list)
     country_specific: bool = False
-    compiled_pattern: Optional[re.Pattern] = field(default=None, init=False, repr=False)
-    
+    compiled_pattern: re.Pattern | None = field(default=None, init=False, repr=False)
+
     def __post_init__(self):
         """Compile regex pattern with error handling."""
         if self.pattern and isinstance(self.pattern, str):
@@ -107,7 +112,7 @@ class DataField:
                 raise ValueError(f"Invalid regex pattern '{self.pattern}': {e}")
         else:
             self.compiled_pattern = None
-    
+
     def validate(self, value: str) -> bool:
         """Validate value against field's pattern."""
         if not self.compiled_pattern:
@@ -118,25 +123,29 @@ class DataField:
 @dataclass
 class CountryRegulation:
     """Country data privacy regulation configuration."""
+
     country_code: str
     country_name: str
     regulation_name: str
     regulation_acronym: str
-    common_fields: List[DataField]
-    specific_fields: List[DataField]
+    common_fields: list[DataField]
+    specific_fields: list[DataField]
     description: str = ""
-    requirements: List[str] = field(default_factory=list)
-    
-    def get_all_fields(self) -> List[DataField]:
+    requirements: list[str] = field(default_factory=list)
+
+    def get_all_fields(self) -> list[DataField]:
         """Get all data fields (common + specific)."""
         return self.common_fields + self.specific_fields
-    
-    def get_high_privacy_fields(self) -> List[DataField]:
+
+    def get_high_privacy_fields(self) -> list[DataField]:
         """Get fields with HIGH or CRITICAL privacy level."""
-        return [f for f in self.get_all_fields() 
-                if f.privacy_level in (PrivacyLevel.HIGH, PrivacyLevel.CRITICAL)]
-    
-    def to_dict(self) -> Dict[str, Any]:
+        return [
+            f
+            for f in self.get_all_fields()
+            if f.privacy_level in (PrivacyLevel.HIGH, PrivacyLevel.CRITICAL)
+        ]
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "country_code": self.country_code,
@@ -154,7 +163,7 @@ class CountryRegulation:
                     "required": f.required,
                     "pattern": f.pattern,
                     "description": f.description,
-                    "examples": f.examples
+                    "examples": f.examples,
                 }
                 for f in self.common_fields
             ],
@@ -168,10 +177,10 @@ class CountryRegulation:
                     "pattern": f.pattern,
                     "description": f.description,
                     "examples": f.examples,
-                    "country_specific": f.country_specific
+                    "country_specific": f.country_specific,
                 }
                 for f in self.specific_fields
-            ]
+            ],
         }
 
 
@@ -179,12 +188,13 @@ class CountryRegulation:
 # Common Data Fields
 # ============================================================================
 
-def get_common_fields() -> List[DataField]:
+
+def get_common_fields() -> list[DataField]:
     """
     Get common data fields applicable to all countries.
-    
+
     These are universal fields that apply across all privacy regulations.
-    
+
     Returns:
         List of common DataField objects
     """
@@ -195,9 +205,9 @@ def get_common_fields() -> List[DataField]:
             field_type=DataFieldType.PERSONAL_NAME,
             privacy_level=PrivacyLevel.HIGH,
             required=True,
-            pattern=r'^[A-Za-z\s\'-]{1,50}$',
+            pattern=r"^[A-Za-z\s\'-]{1,50}$",
             description="Patient's first name",
-            examples=["John", "Maria", "Rajesh"]
+            examples=["John", "Maria", "Rajesh"],
         ),
         DataField(
             name="last_name",
@@ -205,9 +215,9 @@ def get_common_fields() -> List[DataField]:
             field_type=DataFieldType.PERSONAL_NAME,
             privacy_level=PrivacyLevel.HIGH,
             required=True,
-            pattern=r'^[A-Za-z\s\'-]{1,50}$',
+            pattern=r"^[A-Za-z\s\'-]{1,50}$",
             description="Patient's last name",
-            examples=["Doe", "Silva", "Kumar"]
+            examples=["Doe", "Silva", "Kumar"],
         ),
         DataField(
             name="middle_name",
@@ -215,9 +225,9 @@ def get_common_fields() -> List[DataField]:
             field_type=DataFieldType.PERSONAL_NAME,
             privacy_level=PrivacyLevel.MEDIUM,
             required=False,
-            pattern=r'^[A-Za-z\s\'-]{1,50}$',
+            pattern=r"^[A-Za-z\s\'-]{1,50}$",
             description="Patient's middle name",
-            examples=["James", "Carlos", "Raj"]
+            examples=["James", "Carlos", "Raj"],
         ),
         DataField(
             name="date_of_birth",
@@ -225,9 +235,9 @@ def get_common_fields() -> List[DataField]:
             field_type=DataFieldType.DEMOGRAPHIC,
             privacy_level=PrivacyLevel.CRITICAL,
             required=True,
-            pattern=r'^\d{4}-\d{2}-\d{2}$|^\d{2}/\d{2}/\d{4}$|^\d{2}-\d{2}-\d{4}$|^\d{2}\.\d{2}\.\d{4}$',
+            pattern=r"^\d{4}-\d{2}-\d{2}$|^\d{2}/\d{2}/\d{4}$|^\d{2}-\d{2}-\d{4}$|^\d{2}\.\d{2}\.\d{4}$",
             description="Patient's date of birth (supports ISO 8601, slash/hyphen/dot-separated formats)",
-            examples=["1980-01-15", "01/15/1980", "15-01-1980", "15.01.1980"]
+            examples=["1980-01-15", "01/15/1980", "15-01-1980", "15.01.1980"],
         ),
         DataField(
             name="phone_number",
@@ -235,9 +245,9 @@ def get_common_fields() -> List[DataField]:
             field_type=DataFieldType.CONTACT,
             privacy_level=PrivacyLevel.HIGH,
             required=False,
-            pattern=r'^\+?[\d\s\-\(\)]{10,20}$',
+            pattern=r"^\+?[\d\s\-\(\)]{10,20}$",
             description="Contact phone number",
-            examples=["+1-555-123-4567", "9876543210"]
+            examples=["+1-555-123-4567", "9876543210"],
         ),
         DataField(
             name="email",
@@ -245,9 +255,9 @@ def get_common_fields() -> List[DataField]:
             field_type=DataFieldType.CONTACT,
             privacy_level=PrivacyLevel.HIGH,
             required=False,
-            pattern=r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$',
+            pattern=r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$",
             description="Email address",
-            examples=["patient@example.com"]
+            examples=["patient@example.com"],
         ),
         DataField(
             name="address",
@@ -256,7 +266,7 @@ def get_common_fields() -> List[DataField]:
             privacy_level=PrivacyLevel.HIGH,
             required=False,
             description="Street address",
-            examples=["123 Main St, Apt 4B"]
+            examples=["123 Main St, Apt 4B"],
         ),
         DataField(
             name="city",
@@ -265,7 +275,7 @@ def get_common_fields() -> List[DataField]:
             privacy_level=PrivacyLevel.MEDIUM,
             required=False,
             description="City name",
-            examples=["New York", "Mumbai", "São Paulo"]
+            examples=["New York", "Mumbai", "São Paulo"],
         ),
         DataField(
             name="postal_code",
@@ -274,7 +284,7 @@ def get_common_fields() -> List[DataField]:
             privacy_level=PrivacyLevel.MEDIUM,
             required=False,
             description="Postal or ZIP code",
-            examples=["10001", "400001", "01310-100"]
+            examples=["10001", "400001", "01310-100"],
         ),
         DataField(
             name="gender",
@@ -282,9 +292,9 @@ def get_common_fields() -> List[DataField]:
             field_type=DataFieldType.DEMOGRAPHIC,
             privacy_level=PrivacyLevel.LOW,
             required=False,
-            pattern=r'^(Male|Female|Other|M|F|O)$',
+            pattern=r"^(Male|Female|Other|M|F|O)$",
             description="Gender",
-            examples=["Male", "Female", "Other"]
+            examples=["Male", "Female", "Other"],
         ),
     ]
 
@@ -292,6 +302,7 @@ def get_common_fields() -> List[DataField]:
 # ============================================================================
 # Country-Specific Regulations
 # ============================================================================
+
 
 def get_us_regulation() -> CountryRegulation:
     """United States - HIPAA regulation."""
@@ -308,10 +319,10 @@ def get_us_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{3}-\d{2}-\d{4}$|^\d{9}$',
+                pattern=r"^\d{3}-\d{2}-\d{4}$|^\d{9}$",
                 description="US Social Security Number",
                 examples=["123-45-6789", "123456789"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="mrn",
@@ -319,10 +330,10 @@ def get_us_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=True,
-                pattern=r'^[A-Z0-9]{6,12}$',
+                pattern=r"^[A-Z0-9]{6,12}$",
                 description="Hospital Medical Record Number",
                 examples=["MRN123456", "H12345678"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="insurance_id",
@@ -332,7 +343,7 @@ def get_us_regulation() -> CountryRegulation:
                 required=False,
                 description="Health insurance member ID",
                 examples=["INS123456789"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="HIPAA Privacy, Security, and Breach Notification Rules; HITECH strengthens enforcement and penalties",
@@ -344,8 +355,8 @@ def get_us_regulation() -> CountryRegulation:
             "Ages over 89 must be aggregated",
             "Dates must be shifted by consistent offset (multi-format support: ISO 8601, slash/hyphen/dot-separated)",
             "Geographic subdivisions smaller than state must be removed (except first 3 digits of ZIP if > 20,000 people)",
-            "Business Associate Agreements required for third-party processors"
-        ]
+            "Business Associate Agreements required for third-party processors",
+        ],
     )
 
 
@@ -364,10 +375,10 @@ def get_india_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{4}\s?\d{4}\s?\d{4}$|^\d{12}$',
+                pattern=r"^\d{4}\s?\d{4}\s?\d{4}$|^\d{12}$",
                 description="Unique Identification Authority of India number",
                 examples=["1234 5678 9012", "123456789012"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="pan_number",
@@ -375,10 +386,10 @@ def get_india_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.HIGH,
                 required=False,
-                pattern=r'^[A-Z]{5}\d{4}[A-Z]$',
+                pattern=r"^[A-Z]{5}\d{4}[A-Z]$",
                 description="Permanent Account Number for taxation",
                 examples=["ABCDE1234F"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="voter_id",
@@ -386,10 +397,10 @@ def get_india_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.HIGH,
                 required=False,
-                pattern=r'^[A-Z]{3}\d{7}$',
+                pattern=r"^[A-Z]{3}\d{7}$",
                 description="Electoral Photo Identity Card number",
                 examples=["ABC1234567"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="passport_number",
@@ -397,10 +408,10 @@ def get_india_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^[A-Z]\d{7}$',
+                pattern=r"^[A-Z]\d{7}$",
                 description="Indian passport number",
                 examples=["A1234567"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="DPDPA 2023 regulates processing of digital personal data",
@@ -409,8 +420,8 @@ def get_india_regulation() -> CountryRegulation:
             "Data minimization principle",
             "Purpose limitation",
             "Storage limitation",
-            "Right to erasure and correction"
-        ]
+            "Right to erasure and correction",
+        ],
     )
 
 
@@ -429,10 +440,10 @@ def get_indonesia_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{16}$',
+                pattern=r"^\d{16}$",
                 description="National Identity Number (16 digits)",
                 examples=["3201234567890123"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="kk_number",
@@ -440,10 +451,10 @@ def get_indonesia_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.HIGH,
                 required=False,
-                pattern=r'^\d{16}$',
+                pattern=r"^\d{16}$",
                 description="Family Card Number",
                 examples=["3201234567890123"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="npwp",
@@ -451,10 +462,10 @@ def get_indonesia_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.HIGH,
                 required=False,
-                pattern=r'^\d{2}\.\d{3}\.\d{3}\.\d{1}-\d{3}\.\d{3}$|^\d{15}$',
+                pattern=r"^\d{2}\.\d{3}\.\d{3}\.\d{1}-\d{3}\.\d{3}$|^\d{15}$",
                 description="Taxpayer Identification Number",
                 examples=["01.234.567.8-901.234", "012345678901234"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="UU PDP No. 27 of 2022 governs personal data protection",
@@ -462,8 +473,8 @@ def get_indonesia_regulation() -> CountryRegulation:
             "Consent-based data processing",
             "Data protection officer required for large processors",
             "Cross-border transfer restrictions",
-            "Breach notification within 72 hours"
-        ]
+            "Breach notification within 72 hours",
+        ],
     )
 
 
@@ -482,10 +493,10 @@ def get_brazil_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{3}\.\d{3}\.\d{3}-\d{2}$|^\d{11}$',
+                pattern=r"^\d{3}\.\d{3}\.\d{3}-\d{2}$|^\d{11}$",
                 description="Individual Taxpayer Registry",
                 examples=["123.456.789-01", "12345678901"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="rg",
@@ -493,10 +504,10 @@ def get_brazil_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.HIGH,
                 required=False,
-                pattern=r'^\d{1,2}\.\d{3}\.\d{3}-[A-Z0-9]$',
+                pattern=r"^\d{1,2}\.\d{3}\.\d{3}-[A-Z0-9]$",
                 description="General Registry (ID card)",
                 examples=["12.345.678-9"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="sus_number",
@@ -504,10 +515,10 @@ def get_brazil_regulation() -> CountryRegulation:
                 field_type=DataFieldType.MEDICAL,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{15}$',
+                pattern=r"^\d{15}$",
                 description="Sistema Único de Saúde (Unified Health System) number",
                 examples=["123456789012345"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="LGPD (Law 13.709/2018) is Brazil's comprehensive data protection law",
@@ -515,8 +526,8 @@ def get_brazil_regulation() -> CountryRegulation:
             "Legal basis required for processing",
             "Data protection impact assessment for high-risk processing",
             "Data protection officer for public bodies and large processors",
-            "Sensitive data requires specific consent"
-        ]
+            "Sensitive data requires specific consent",
+        ],
     )
 
 
@@ -535,10 +546,10 @@ def get_philippines_regulation() -> CountryRegulation:
                 field_type=DataFieldType.MEDICAL,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{2}-\d{9}-\d$|^\d{12}$',
+                pattern=r"^\d{2}-\d{9}-\d$|^\d{12}$",
                 description="Philippine Health Insurance Corporation number",
                 examples=["12-345678901-2", "123456789012"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="umid",
@@ -546,10 +557,10 @@ def get_philippines_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.HIGH,
                 required=False,
-                pattern=r'^\d{4}-\d{7}-\d$|^\d{12}$',
+                pattern=r"^\d{4}-\d{7}-\d$|^\d{12}$",
                 description="Unified Multi-Purpose ID",
                 examples=["1234-5678901-2", "123456789012"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="sss_number",
@@ -557,10 +568,10 @@ def get_philippines_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.HIGH,
                 required=False,
-                pattern=r'^\d{2}-\d{7}-\d$|^\d{10}$',
+                pattern=r"^\d{2}-\d{7}-\d$|^\d{10}$",
                 description="Social Security System number",
                 examples=["12-3456789-0", "1234567890"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="Republic Act No. 10173 protects personal information",
@@ -568,8 +579,8 @@ def get_philippines_regulation() -> CountryRegulation:
             "Consent or legitimate interest required",
             "Privacy policy must be provided",
             "Data breach notification to NPC within 72 hours",
-            "Security measures proportionate to risk"
-        ]
+            "Security measures proportionate to risk",
+        ],
     )
 
 
@@ -588,10 +599,10 @@ def get_south_africa_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{13}$',
+                pattern=r"^\d{13}$",
                 description="13-digit ID number (YYMMDD-GSSS-C-AZ)",
                 examples=["8001015009087"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="passport_number",
@@ -599,10 +610,10 @@ def get_south_africa_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^[A-Z]\d{8}$',
+                pattern=r"^[A-Z]\d{8}$",
                 description="South African passport number",
                 examples=["A12345678"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="POPIA (Act 4 of 2013) regulates processing of personal information",
@@ -611,8 +622,8 @@ def get_south_africa_regulation() -> CountryRegulation:
             "Collect for specific purpose with consent",
             "Further processing compatible with original purpose",
             "Adequate security measures",
-            "Data subject participation rights"
-        ]
+            "Data subject participation rights",
+        ],
     )
 
 
@@ -633,7 +644,7 @@ def get_eu_regulation() -> CountryRegulation:
                 required=False,
                 description="National identification number (varies by country)",
                 examples=["Varies by EU country"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="eu_health_card",
@@ -643,7 +654,7 @@ def get_eu_regulation() -> CountryRegulation:
                 required=False,
                 description="EHIC number",
                 examples=["Varies by country"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="GDPR (2016/679) special-category health data requires explicit consent/legal basis",
@@ -656,8 +667,8 @@ def get_eu_regulation() -> CountryRegulation:
             "Privacy by design and by default",
             "Breach notification within 72 hours",
             "Data Protection Impact Assessment for high-risk processing",
-            "Notable member states: Germany (BDSG/SGB), France (Code de la santé publique), Netherlands (WGBO/AVG)"
-        ]
+            "Notable member states: Germany (BDSG/SGB), France (Code de la santé publique), Netherlands (WGBO/AVG)",
+        ],
     )
 
 
@@ -676,10 +687,10 @@ def get_uk_regulation() -> CountryRegulation:
                 field_type=DataFieldType.MEDICAL,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{3}\s?\d{3}\s?\d{4}$|^\d{10}$',
+                pattern=r"^\d{3}\s?\d{3}\s?\d{4}$|^\d{10}$",
                 description="National Health Service unique patient identifier",
                 examples=["123 456 7890", "1234567890"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="national_insurance",
@@ -687,10 +698,10 @@ def get_uk_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^[A-Z]{2}\d{6}[A-D]$',
+                pattern=r"^[A-Z]{2}\d{6}[A-D]$",
                 description="UK National Insurance number",
                 examples=["AB123456C"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="UK GDPR + DPA 2018 treats health data as special category; governed by Caldicott Principles and NHS info governance",
@@ -701,8 +712,8 @@ def get_uk_regulation() -> CountryRegulation:
             "Lawful basis and special category condition required",
             "Data Protection Impact Assessment for high-risk processing",
             "ICO breach notification within 72 hours",
-            "Privacy by design and default"
-        ]
+            "Privacy by design and default",
+        ],
     )
 
 
@@ -723,7 +734,7 @@ def get_canada_regulation() -> CountryRegulation:
                 required=False,
                 description="Provincial health insurance card (format varies by province)",
                 examples=["Varies by province"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="sin",
@@ -731,10 +742,10 @@ def get_canada_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{3}-\d{3}-\d{3}$|^\d{9}$',
+                pattern=r"^\d{3}-\d{3}-\d{3}$|^\d{9}$",
                 description="Canadian Social Insurance Number",
                 examples=["123-456-789", "123456789"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="PIPEDA (federal) for private sector; provincial laws: Ontario PHIPA, Alberta HIA, BC PIPA/eHealth Act",
@@ -745,8 +756,8 @@ def get_canada_regulation() -> CountryRegulation:
             "Individual access and correction rights",
             "Security safeguards proportionate to sensitivity",
             "Breach notification to Privacy Commissioner and affected individuals",
-            "Accountability principle"
-        ]
+            "Accountability principle",
+        ],
     )
 
 
@@ -765,10 +776,10 @@ def get_australia_regulation() -> CountryRegulation:
                 field_type=DataFieldType.MEDICAL,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{10}$|^\d{4}\s?\d{5}\s?\d{1}$',
+                pattern=r"^\d{10}$|^\d{4}\s?\d{5}\s?\d{1}$",
                 description="Medicare card number",
                 examples=["1234567890", "1234 56789 0"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="ihi_number",
@@ -776,10 +787,10 @@ def get_australia_regulation() -> CountryRegulation:
                 field_type=DataFieldType.MEDICAL,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{16}$',
+                pattern=r"^\d{16}$",
                 description="IHI number for My Health Record",
                 examples=["8003608166690503"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="tfn",
@@ -787,10 +798,10 @@ def get_australia_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{8,9}$',
+                pattern=r"^\d{8,9}$",
                 description="Australian Tax File Number",
                 examples=["123456789"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="Privacy Act 1988 + APPs treat health data as sensitive; My Health Records Act 2012 governs digital health records",
@@ -801,8 +812,8 @@ def get_australia_regulation() -> CountryRegulation:
             "Consent or legal authority required for sensitive data",
             "Security safeguards for personal information",
             "Breach notification under Notifiable Data Breaches scheme",
-            "Individual access and correction rights"
-        ]
+            "Individual access and correction rights",
+        ],
     )
 
 
@@ -821,10 +832,10 @@ def get_kenya_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{7,8}$',
+                pattern=r"^\d{7,8}$",
                 description="Kenyan National ID number",
                 examples=["12345678"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="nhif_number",
@@ -834,7 +845,7 @@ def get_kenya_regulation() -> CountryRegulation:
                 required=False,
                 description="National Hospital Insurance Fund number",
                 examples=["123456789"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="Data Protection Act 2019 treats health data as sensitive; Health Act 2017 ensures patient confidentiality",
@@ -845,8 +856,8 @@ def get_kenya_regulation() -> CountryRegulation:
             "Cross-border transfer restrictions for sensitive data",
             "Security safeguards required",
             "Breach notification obligations",
-            "Data subject rights (access, correction, erasure)"
-        ]
+            "Data subject rights (access, correction, erasure)",
+        ],
     )
 
 
@@ -865,10 +876,10 @@ def get_nigeria_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^\d{11}$',
+                pattern=r"^\d{11}$",
                 description="11-digit National Identification Number",
                 examples=["12345678901"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="nhis_number",
@@ -878,7 +889,7 @@ def get_nigeria_regulation() -> CountryRegulation:
                 required=False,
                 description="National Health Insurance Scheme number",
                 examples=["NIG-123456789"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="Nigeria Data Protection Act 2023 treats health data as sensitive; enforced by NDPC",
@@ -889,8 +900,8 @@ def get_nigeria_regulation() -> CountryRegulation:
             "Data localization requirements for sensitive data",
             "Mandatory data protection audits",
             "Breach notification within 72 hours",
-            "Data Protection Officer required for certain entities"
-        ]
+            "Data Protection Officer required for certain entities",
+        ],
     )
 
 
@@ -909,10 +920,10 @@ def get_ghana_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^GHA-\d{9}-\d$',
+                pattern=r"^GHA-\d{9}-\d$",
                 description="Ghana National Identification Card",
                 examples=["GHA-123456789-0"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="nhis_number",
@@ -922,7 +933,7 @@ def get_ghana_regulation() -> CountryRegulation:
                 required=False,
                 description="National Health Insurance Scheme number",
                 examples=["NHIS-123456789"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="Data Protection Act 2012 treats health data as sensitive; Ghana Health Service confidentiality rules apply",
@@ -933,8 +944,8 @@ def get_ghana_regulation() -> CountryRegulation:
             "Data Protection Commission oversight",
             "Security measures for sensitive data",
             "Cross-border transfer restrictions",
-            "Data subject access and correction rights"
-        ]
+            "Data subject access and correction rights",
+        ],
     )
 
 
@@ -953,10 +964,10 @@ def get_uganda_regulation() -> CountryRegulation:
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
-                pattern=r'^[A-Z]{2}[0-9A-Z]{12}$',
+                pattern=r"^[A-Z]{2}[0-9A-Z]{12}$",
                 description="National Identification Number",
                 examples=["CM12345678901AB"],
-                country_specific=True
+                country_specific=True,
             ),
             DataField(
                 name="nssf_number",
@@ -966,7 +977,7 @@ def get_uganda_regulation() -> CountryRegulation:
                 required=False,
                 description="National Social Security Fund number",
                 examples=["NSSF-123456"],
-                country_specific=True
+                country_specific=True,
             ),
         ],
         description="Data Protection and Privacy Act 2019 treats health data as sensitive; Public Health Act ensures medical records confidentiality",
@@ -977,8 +988,8 @@ def get_uganda_regulation() -> CountryRegulation:
             "Personal Data Protection Office oversight",
             "Security safeguards required",
             "Breach notification obligations",
-            "Data subject rights (access, correction, deletion)"
-        ]
+            "Data subject rights (access, correction, deletion)",
+        ],
     )
 
 
@@ -986,19 +997,20 @@ def get_uganda_regulation() -> CountryRegulation:
 # Country Regulation Manager
 # ============================================================================
 
+
 class CountryRegulationManager:
     """
     Manages country-specific regulations and data fields.
-    
+
     Supports:
     - Loading regulations for one or more countries
     - Merging fields from multiple countries
     - Generating combined detection patterns
     - Exporting configurations
     """
-    
+
     # Registry of all supported countries (private to prevent external modification)
-    _REGISTRY: Dict[str, callable] = {
+    _REGISTRY: dict[str, Callable[[], "CountryRegulation"]] = {
         "US": get_us_regulation,
         "IN": get_india_regulation,
         "ID": get_indonesia_regulation,
@@ -1014,17 +1026,17 @@ class CountryRegulationManager:
         "GH": get_ghana_regulation,
         "UG": get_uganda_regulation,
     }
-    
-    def __init__(self, countries: Optional[Union[List[str], str]] = None):
+
+    def __init__(self, countries: list[str] | str | None = None):
         """
         Initialize regulation manager.
-        
+
         Args:
             countries: List of country codes or 'ALL' for all countries.
                       If None, defaults to IN (India).
         """
         self.logger = logging.getLogger(__name__)
-        
+
         # Parse countries
         if countries is None:
             self.country_codes = ["IN"]
@@ -1035,122 +1047,135 @@ class CountryRegulationManager:
                 self.country_codes = [countries.upper()]
         else:
             self.country_codes = [c.upper() for c in countries]
-        
+
         # Validate country codes
         invalid = set(self.country_codes) - set(self._REGISTRY.keys())
         if invalid:
-            raise ValueError(f"Unsupported country codes: {invalid}. "
-                           f"Supported: {list(self._REGISTRY.keys())}")
-        
+            raise ValueError(
+                f"Unsupported country codes: {invalid}. "
+                f"Supported: {list(self._REGISTRY.keys())}"
+            )
+
         # Load regulations
-        self.regulations: Dict[str, CountryRegulation] = {}
+        self.regulations: dict[str, CountryRegulation] = {}
         for code in self.country_codes:
             self.regulations[code] = self._REGISTRY[code]()
-            self.logger.info(f"Loaded regulation for {code}: {self.regulations[code].regulation_acronym}")
-    
+            self.logger.info(
+                f"Loaded regulation for {code}: {self.regulations[code].regulation_acronym}"
+            )
+
     @classmethod
-    def get_supported_countries(cls) -> List[str]:
+    def get_supported_countries(cls) -> list[str]:
         """Get list of all supported country codes."""
         return list(cls._REGISTRY.keys())
-    
+
     @classmethod
-    def get_country_info(cls, country_code: str) -> Dict[str, str]:
+    def get_country_info(cls, country_code: str) -> dict[str, str]:
         """
         Get information about a country's regulation.
-        
+
         Args:
             country_code: ISO country code
-            
+
         Returns:
             Dictionary with country information
         """
         if country_code.upper() not in cls._REGISTRY:
             raise ValueError(f"Unsupported country code: {country_code}")
-        
+
         reg = cls._REGISTRY[country_code.upper()]()
         return {
             "code": reg.country_code,
             "name": reg.country_name,
             "regulation": reg.regulation_name,
             "acronym": reg.regulation_acronym,
-            "description": reg.description
+            "description": reg.description,
         }
-    
-    def get_all_data_fields(self, include_common: bool = True) -> List[DataField]:
+
+    def get_all_data_fields(self, include_common: bool = True) -> list[DataField]:
         """
         Get all data fields from all loaded countries.
-        
+
         Args:
             include_common: Whether to include common fields
-            
+
         Returns:
             Combined list of all unique data fields
         """
-        fields_dict: Dict[str, DataField] = {}
-        
+        fields_dict: dict[str, DataField] = {}
+
         for regulation in self.regulations.values():
             if include_common:
                 for field in regulation.common_fields:
                     if field.name not in fields_dict:
                         fields_dict[field.name] = field
-            
+
             for field in regulation.specific_fields:
                 # Use country-specific name for country-specific fields
-                key = f"{regulation.country_code}_{field.name}" if field.country_specific else field.name
+                key = (
+                    f"{regulation.country_code}_{field.name}"
+                    if field.country_specific
+                    else field.name
+                )
                 if key not in fields_dict:
                     fields_dict[key] = field
-        
+
         return list(fields_dict.values())
-    
-    def get_country_specific_fields(self, country_code: Optional[str] = None) -> List[DataField]:
+
+    def get_country_specific_fields(
+        self, country_code: str | None = None
+    ) -> list[DataField]:
         """
         Get country-specific fields.
-        
+
         Args:
             country_code: Specific country code or None for all
-            
+
         Returns:
             List of country-specific fields
         """
         fields = []
-        
+
         if country_code:
             if country_code.upper() in self.regulations:
                 fields = self.regulations[country_code.upper()].specific_fields
         else:
             for regulation in self.regulations.values():
                 fields.extend(regulation.specific_fields)
-        
+
         return fields
-    
-    def get_high_privacy_fields(self) -> List[DataField]:
+
+    def get_high_privacy_fields(self) -> list[DataField]:
         """Get all fields with HIGH or CRITICAL privacy level."""
         all_fields = self.get_all_data_fields()
-        return [f for f in all_fields 
-                if f.privacy_level in (PrivacyLevel.HIGH, PrivacyLevel.CRITICAL)]
-    
-    def get_detection_patterns(self) -> Dict[str, re.Pattern]:
+        return [
+            f
+            for f in all_fields
+            if f.privacy_level in (PrivacyLevel.HIGH, PrivacyLevel.CRITICAL)
+        ]
+
+    def get_detection_patterns(self) -> dict[str, re.Pattern]:
         """
         Get all regex patterns for detecting country-specific identifiers.
-        
+
         Returns:
             Dictionary mapping field name to compiled regex pattern
         """
         patterns = {}
-        
+
         for field in self.get_all_data_fields():
             if field.compiled_pattern:
                 patterns[field.name] = field.compiled_pattern
-        
+
         return patterns
-    
-    def export_configuration(self, output_path: Union[str, Path]) -> None:
+
+    def export_configuration(self, output_path: str | Path) -> None:
         """
         Export current configuration to JSON file.
-        
+
         Args:
             output_path: Path to output file
-            
+
         Raises:
             IOError: If file cannot be written
         """
@@ -1158,8 +1183,7 @@ class CountryRegulationManager:
             config = {
                 "countries": self.country_codes,
                 "regulations": {
-                    code: reg.to_dict()
-                    for code, reg in self.regulations.items()
+                    code: reg.to_dict() for code, reg in self.regulations.items()
                 },
                 "all_fields": [
                     {
@@ -1170,41 +1194,44 @@ class CountryRegulationManager:
                         "required": f.required,
                         "pattern": f.pattern,
                         "description": f.description,
-                        "country_specific": f.country_specific
+                        "country_specific": f.country_specific,
                     }
                     for f in self.get_all_data_fields()
-                ]
+                ],
             }
-            
+
             output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(output_path, 'w', encoding='utf-8') as f:
+
+            with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
-            
+
             self.logger.info(f"Exported configuration to {output_path}")
-            
-        except (IOError, OSError) as e:
-            raise IOError(f"Failed to export configuration to {output_path}: {e}") from e
-    
-    def get_requirements_summary(self) -> Dict[str, List[str]]:
+
+        except OSError as e:
+            raise OSError(
+                f"Failed to export configuration to {output_path}: {e}"
+            ) from e
+
+    def get_requirements_summary(self) -> dict[str, list[str]]:
         """
         Get summary of all regulatory requirements.
-        
+
         Returns:
             Dictionary mapping country code to list of requirements
         """
-        return {
-            code: reg.requirements
-            for code, reg in self.regulations.items()
-        }
-    
+        return {code: reg.requirements for code, reg in self.regulations.items()}
+
     def __str__(self) -> str:
         """String representation."""
-        countries = ", ".join([f"{code} ({self.regulations[code].regulation_acronym})" 
-                              for code in self.country_codes])
+        countries = ", ".join(
+            [
+                f"{code} ({self.regulations[code].regulation_acronym})"
+                for code in self.country_codes
+            ]
+        )
         return f"CountryRegulationManager(countries=[{countries}])"
-    
+
     def __repr__(self) -> str:
         """Detailed representation."""
         return f"CountryRegulationManager(country_codes={self.country_codes})"
@@ -1214,16 +1241,17 @@ class CountryRegulationManager:
 # Utility Functions
 # ============================================================================
 
+
 def get_regulation_for_country(country_code: str) -> CountryRegulation:
     """
     Get regulation configuration for a specific country.
-    
+
     Args:
         country_code: ISO 3166-1 alpha-2 country code
-        
+
     Returns:
         CountryRegulation object
-        
+
     Raises:
         ValueError: If country code is not supported
     """
@@ -1231,10 +1259,10 @@ def get_regulation_for_country(country_code: str) -> CountryRegulation:
     return manager.regulations[country_code.upper()]
 
 
-def get_all_supported_countries() -> Dict[str, str]:
+def get_all_supported_countries() -> dict[str, str]:
     """
     Get all supported countries with their regulation names.
-    
+
     Returns:
         Dictionary mapping country code to regulation acronym
     """
@@ -1245,13 +1273,13 @@ def get_all_supported_countries() -> Dict[str, str]:
     return result
 
 
-def merge_regulations(country_codes: List[str]) -> Dict[str, Any]:
+def merge_regulations(country_codes: list[str]) -> dict[str, Any]:
     """
     Merge regulations from multiple countries.
-    
+
     Args:
         country_codes: List of country codes to merge
-        
+
     Returns:
         Dictionary with merged configuration
     """
@@ -1261,7 +1289,7 @@ def merge_regulations(country_codes: List[str]) -> Dict[str, Any]:
         "all_fields": manager.get_all_data_fields(),
         "high_privacy_fields": manager.get_high_privacy_fields(),
         "detection_patterns": manager.get_detection_patterns(),
-        "requirements": manager.get_requirements_summary()
+        "requirements": manager.get_requirements_summary(),
     }
 
 
@@ -1269,36 +1297,50 @@ def merge_regulations(country_codes: List[str]) -> Dict[str, Any]:
 # CLI Interface
 # ============================================================================
 
+
 def main():
     """Command-line interface for testing regulations."""
     import argparse
-    
-    parser = argparse.ArgumentParser(description="Country-specific data privacy regulations")
-    parser.add_argument("-c", "--countries", nargs="+", default=["US"],
-                       help="Country codes (e.g., US IN) or ALL")
-    parser.add_argument("--list", action="store_true", help="List all supported countries")
+
+    parser = argparse.ArgumentParser(
+        description="Country-specific data privacy regulations"
+    )
+    parser.add_argument(
+        "-c",
+        "--countries",
+        nargs="+",
+        default=["US"],
+        help="Country codes (e.g., US IN) or ALL",
+    )
+    parser.add_argument(
+        "--list", action="store_true", help="List all supported countries"
+    )
     parser.add_argument("--export", help="Export configuration to JSON file")
-    parser.add_argument("--show-fields", action="store_true", help="Show all data fields")
-    
+    parser.add_argument(
+        "--show-fields", action="store_true", help="Show all data fields"
+    )
+
     args = parser.parse_args()
-    
+
     # Setup logging
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-    
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
     if args.list:
         print("\nSupported Countries:")
         print("=" * 70)
         for code, name in get_all_supported_countries().items():
             print(f"  {code}: {name}")
         return
-    
+
     # Create manager
-    countries = ["ALL"] if "ALL" in [c.upper() for c in args.countries] else args.countries
+    countries = (
+        ["ALL"] if "ALL" in [c.upper() for c in args.countries] else args.countries
+    )
     manager = CountryRegulationManager(countries=countries)
-    
+
     print(f"\n{manager}")
     print("=" * 70)
-    
+
     for code, reg in manager.regulations.items():
         print(f"\n{reg.country_name} ({code})")
         print(f"  Regulation: {reg.regulation_name} ({reg.regulation_acronym})")
@@ -1309,20 +1351,22 @@ def main():
         print(f"  Requirements: {len(reg.requirements)}")
         for req in reg.requirements:
             print(f"    • {req}")
-    
+
     if args.show_fields:
         print(f"\n\nAll Data Fields ({len(manager.get_all_data_fields())})")
         print("=" * 70)
         for field in manager.get_all_data_fields():
             country_tag = " [Country-Specific]" if field.country_specific else ""
             print(f"  {field.display_name}: {field.description}{country_tag}")
-            print(f"    Type: {field.field_type.value}, Privacy: {field.privacy_level.name}")
+            print(
+                f"    Type: {field.field_type.value}, Privacy: {field.privacy_level.name}"
+            )
             if field.pattern:
                 print(f"    Pattern: {field.pattern}")
             if field.examples:
                 print(f"    Examples: {', '.join(field.examples)}")
             print()
-    
+
     if args.export:
         manager.export_configuration(args.export)
         print(f"\nConfiguration exported to: {args.export}")
