@@ -156,14 +156,16 @@ help:
 	@printf "\n"
 	@printf "$(BOLD)$(GREEN)Versioning (Commitizen):$(NC)\n"
 	@printf "  $(CYAN)make commit$(NC)          Interactive conventional commit\n"
-	@printf "  $(CYAN)make bump$(NC)            Auto-bump version based on commits\n"
+	@printf "  $(CYAN)make bump$(NC)            Bump version based on commits (local)\n"
 	@printf "  $(CYAN)make bump-dry$(NC)        Preview version bump (no changes)\n"
 	@printf "  $(CYAN)make bump-patch$(NC)      Force PATCH bump (0.0.x)\n"
 	@printf "  $(CYAN)make bump-minor$(NC)      Force MINOR bump (0.x.0)\n"
 	@printf "  $(CYAN)make bump-major$(NC)      Force MAJOR bump (x.0.0)\n"
 	@printf "  $(CYAN)make changelog$(NC)       Generate/update CHANGELOG.md\n"
-	@printf "  $(CYAN)make hooks$(NC)           Install pre-commit hooks\n"
+	@printf "  $(CYAN)make hooks$(NC)           Install commit-msg validation hook\n"
 	@printf "  $(CYAN)make pre-commit$(NC)      Run all hooks on all files\n"
+	@printf "\n"
+	@printf "$(BOLD)$(YELLOW)Note:$(NC) Version auto-bumps via GitHub Actions on push to main\n"
 	@printf "\n"
 	@printf "$(BOLD)$(YELLOW)Environment:$(NC)\n"
 	@printf "  Python: $(PYTHON_CMD)\n"
@@ -462,11 +464,12 @@ changelog:
 	@$(VENV_DIR)/bin/cz changelog
 	@printf "$(GREEN)✓ Changelog updated$(NC)\n"
 
-# Install pre-commit hooks
+# Install pre-commit hooks (commit-msg validation only)
 hooks:
-	@printf "$(BLUE)Installing pre-commit hooks...$(NC)\n"
+	@printf "$(BLUE)Installing git hooks...$(NC)\n"
 	@$(VENV_DIR)/bin/pre-commit install --hook-type commit-msg --hook-type pre-commit
-	@printf "$(GREEN)✓ Pre-commit hooks installed$(NC)\n"
+	@printf "$(GREEN)✓ Hooks installed (commit-msg validation)$(NC)\n"
+	@printf "$(CYAN)  → Version bump happens via CI/CD or 'make bump'$(NC)\n"
 
 # Run all pre-commit hooks on all files
 pre-commit:
