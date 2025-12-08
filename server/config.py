@@ -32,12 +32,11 @@ See Also:
 
 from __future__ import annotations
 
-import os
 import secrets
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any, Self
+from typing import Annotated, Self
 
 from pydantic import (
     Field,

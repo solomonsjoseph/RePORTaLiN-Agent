@@ -36,7 +36,7 @@ import logging
 import sys
 from contextvars import ContextVar
 from datetime import datetime, timezone
-from typing import Any, MutableMapping
+from typing import Any
 
 import structlog
 from structlog.types import EventDict, Processor, WrappedLogger
@@ -271,13 +271,14 @@ def configure_logging(
     processors = _get_processors(use_json)
     
     # Configure structlog
+    # CRITICAL: Use stderr for all log output to avoid corrupting stdio JSON-RPC stream
     structlog.configure(
         processors=processors,
         wrapper_class=structlog.make_filtering_bound_logger(
             getattr(logging, level.upper(), logging.INFO)
         ),
         context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(),
+        logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
         cache_logger_on_first_use=True,
     )
     

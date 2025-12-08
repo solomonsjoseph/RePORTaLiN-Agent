@@ -49,7 +49,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from server.config import get_settings
 from server.logger import get_logger
-from server.security.secrets import RotatableSecret, SecretValidationResult
+from server.security.secrets import RotatableSecret
 
 __all__ = [
     "AuthContext",

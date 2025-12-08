@@ -30,18 +30,16 @@ See Also:
 
 from __future__ import annotations
 
-import time
 from typing import Callable, Any
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response, JSONResponse
+from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from server.security.rate_limiter import (
     RateLimiter,
     RateLimitResult,
-    RateLimitExceeded,
     InMemoryRateLimiter,
     RateLimitConfig,
 )

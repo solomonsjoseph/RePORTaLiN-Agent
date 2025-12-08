@@ -36,7 +36,7 @@ import re
 import time
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field, field_validator
@@ -44,7 +44,6 @@ from pydantic import BaseModel, Field, field_validator
 from server.config import get_settings
 from server.logger import get_logger, bind_context, clear_context
 from shared.constants import SERVER_NAME, SERVER_VERSION, PROTOCOL_VERSION
-from shared.types import ToolResult
 
 __all__ = [
     "mcp",

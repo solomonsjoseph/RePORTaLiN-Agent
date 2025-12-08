@@ -74,14 +74,18 @@ class TestMain:
     """Tests for the main entry point function."""
 
     def test_version_flag_prints_and_exits(self, capsys: pytest.CaptureFixture) -> None:
-        """Test that --version prints version info and returns 0."""
+        """Test that --version prints version info to stderr and returns 0.
+        
+        Note: Version output goes to stderr to avoid corrupting stdio JSON-RPC stream.
+        """
         with patch.object(sys, "argv", ["server", "--version"]):
             result = main()
             
             assert result == 0
             captured = capsys.readouterr()
-            assert "reportalin-mcp" in captured.out.lower()
-            assert "MCP Protocol" in captured.out
+            # Version output goes to stderr to not corrupt stdio transport
+            assert "reportalin-mcp" in captured.err.lower()
+            assert "MCP Protocol" in captured.err
 
     def test_version_includes_protocol_version(self, capsys: pytest.CaptureFixture) -> None:
         """Test that --version includes the MCP protocol version."""
@@ -89,5 +93,5 @@ class TestMain:
             main()
             
             captured = capsys.readouterr()
-            # Should mention MCP Protocol version
-            assert "2.0" in captured.out or "Protocol" in captured.out
+            # Version output goes to stderr, should mention MCP Protocol version
+            assert "2.0" in captured.err or "Protocol" in captured.err
