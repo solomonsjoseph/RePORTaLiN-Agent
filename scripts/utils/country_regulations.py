@@ -361,12 +361,27 @@ def get_us_regulation() -> CountryRegulation:
 
 
 def get_india_regulation() -> CountryRegulation:
-    """India - Digital Personal Data Protection Act."""
+    """
+    India - Digital Personal Data Protection Act 2023 + DPDP Rules 2025.
+
+    The DPDPA 2023 (Act No. 22 of 2023) was enacted in August 2023, with the
+    Digital Personal Data Protection Rules 2025 notified in November 2025.
+    Organizations have an 18-month compliance window from November 2025.
+
+    Key points for healthcare/medical research:
+    - Health data is treated as personal data (no separate "sensitive" category like GDPR)
+    - Medical professionals/institutions are Data Fiduciaries
+    - Clinical establishments have some exemptions for healthcare purposes
+    - Data initially collected for patient care must be pseudonymized before research use
+    - Explicit informed consent required for publication and research
+    - Breach notification to Data Protection Board and affected individuals required
+    - Penalties up to ₹250 crore for security failures, ₹200 crore for breach notification failures
+    """
     return CountryRegulation(
         country_code="IN",
         country_name="India",
-        regulation_name="Digital Personal Data Protection Act",
-        regulation_acronym="DPDPA",
+        regulation_name="Digital Personal Data Protection Act 2023 + DPDP Rules 2025",
+        regulation_acronym="DPDPA 2023",
         common_fields=get_common_fields(),
         specific_fields=[
             DataField(
@@ -376,7 +391,7 @@ def get_india_regulation() -> CountryRegulation:
                 privacy_level=PrivacyLevel.CRITICAL,
                 required=False,
                 pattern=r"^\d{4}\s?\d{4}\s?\d{4}$|^\d{12}$",
-                description="Unique Identification Authority of India number",
+                description="Unique Identification Authority of India (UIDAI) 12-digit number",
                 examples=["1234 5678 9012", "123456789012"],
                 country_specific=True,
             ),
@@ -387,18 +402,18 @@ def get_india_regulation() -> CountryRegulation:
                 privacy_level=PrivacyLevel.HIGH,
                 required=False,
                 pattern=r"^[A-Z]{5}\d{4}[A-Z]$",
-                description="Permanent Account Number for taxation",
+                description="Permanent Account Number for taxation (Income Tax)",
                 examples=["ABCDE1234F"],
                 country_specific=True,
             ),
             DataField(
                 name="voter_id",
-                display_name="Voter ID",
+                display_name="Voter ID (EPIC)",
                 field_type=DataFieldType.IDENTIFIER,
                 privacy_level=PrivacyLevel.HIGH,
                 required=False,
                 pattern=r"^[A-Z]{3}\d{7}$",
-                description="Electoral Photo Identity Card number",
+                description="Electoral Photo Identity Card (EPIC) number",
                 examples=["ABC1234567"],
                 country_specific=True,
             ),
@@ -413,14 +428,111 @@ def get_india_regulation() -> CountryRegulation:
                 examples=["A1234567"],
                 country_specific=True,
             ),
+            DataField(
+                name="driving_license",
+                display_name="Driving License Number",
+                field_type=DataFieldType.IDENTIFIER,
+                privacy_level=PrivacyLevel.HIGH,
+                required=False,
+                pattern=r"^[A-Z]{2}\d{2}\s?\d{4}\s?\d{7}$|^[A-Z]{2}-\d{2}-\d{4}-\d{7}$",
+                description="Indian Driving License number",
+                examples=["DL01 2023 0001234", "DL-01-2023-0001234"],
+                country_specific=True,
+            ),
+            DataField(
+                name="ration_card",
+                display_name="Ration Card Number",
+                field_type=DataFieldType.IDENTIFIER,
+                privacy_level=PrivacyLevel.HIGH,
+                required=False,
+                description="State-issued Ration Card number (format varies by state)",
+                examples=["Varies by state"],
+                country_specific=True,
+            ),
+            DataField(
+                name="abha_id",
+                display_name="ABHA ID (Ayushman Bharat Health Account)",
+                field_type=DataFieldType.MEDICAL,
+                privacy_level=PrivacyLevel.CRITICAL,
+                required=False,
+                pattern=r"^\d{14}$|^\d{2}-\d{4}-\d{4}-\d{4}$",
+                description="14-digit Ayushman Bharat Health Account identifier",
+                examples=["12345678901234", "12-3456-7890-1234"],
+                country_specific=True,
+            ),
+            DataField(
+                name="uhid",
+                display_name="UHID (Unique Health ID)",
+                field_type=DataFieldType.MEDICAL,
+                privacy_level=PrivacyLevel.CRITICAL,
+                required=False,
+                description="Hospital-specific Unique Health ID",
+                examples=["AIIMS-2023-123456"],
+                country_specific=True,
+            ),
+            DataField(
+                name="pmjay_id",
+                display_name="PM-JAY ID (Ayushman Bharat)",
+                field_type=DataFieldType.MEDICAL,
+                privacy_level=PrivacyLevel.HIGH,
+                required=False,
+                description="Pradhan Mantri Jan Arogya Yojana beneficiary ID",
+                examples=["PMJAY-123456789"],
+                country_specific=True,
+            ),
         ],
-        description="DPDPA 2023 regulates processing of digital personal data",
+        description=(
+            "DPDPA 2023 (Act No. 22 of 2023) + DPDP Rules 2025 regulate digital personal data processing. "
+            "Health data is personal data requiring consent; medical professionals are Data Fiduciaries. "
+            "Enforced by Data Protection Board of India. Penalties: up to ₹250 crore for security failures."
+        ),
         requirements=[
-            "Obtain consent for data processing",
-            "Data minimization principle",
-            "Purpose limitation",
-            "Storage limitation",
-            "Right to erasure and correction",
+            # Consent Requirements (DPDP Rules 2025)
+            "Clear, specific, informed consent required before processing personal data",
+            "Consent notices must be easy-to-understand, in preferred language of data principal",
+            "Consent must specify: data collected, processing purposes, rights, complaint procedures",
+            "Layered consent allowing granular choices for different data categories (not blanket)",
+            "Data principal may withdraw consent easily at any time",
+            "Consent Managers (India-based) for transparent consent grant/manage/review/withdraw",
+            "Verifiable parental/guardian consent required for minors and persons with disabilities",
+            # Data Subject Rights
+            "Right to access: summaries of data, who handled it, third-party sharing",
+            "Right to correction: modify inaccurate information",
+            "Right to erasure: request deletion (exceptions for treatment/legal requirements)",
+            "Right to grievance resolution through established procedures",
+            "Response to data principal requests within maximum 90 days",
+            # Healthcare-Specific
+            "Medical professionals/institutions are Data Fiduciaries under DPDPA",
+            "Data collected for patient care must be pseudonymized before research use",
+            "Explicit informed consent for publication with clear data handling communication",
+            "Prior IRB/Ethics Committee approval before converting clinical data for research",
+            "Clinical establishments exempt from some restrictions for healthcare purposes",
+            # Security Safeguards
+            "Implement encryption and strong password protocols",
+            "Role-based access controls limiting staff to role-specific information",
+            "Audit logs tracking data access for minimum one year",
+            "Keep software updated; deploy antivirus protection",
+            "Secure backup systems",
+            "Regular vulnerability assessments and penetration testing (VAPT)",
+            "Dedicated cybersecurity teams for countermeasure preparation",
+            # Breach Notification
+            "Notify Data Protection Board and affected data principals immediately upon breach",
+            "Plain-language breach explanations: what occurred, impacts, remedial actions",
+            "Document breach details and remedial actions; maintain breach records",
+            # Third-Party and Cross-Border
+            "Written data protection agreements with all vendors (processors)",
+            "Verify vendor security practices; maintain responsibility for vendor compliance",
+            "Cross-border transfers: comply with government notifications restricting transfers",
+            "Verify cloud storage provider locations",
+            # Significant Data Fiduciaries (SDFs)
+            "SDFs must appoint Data Protection Officers and independent auditors",
+            "SDFs must conduct regular Data Protection Impact Assessments",
+            # Penalties (DPDP Rules 2025)
+            "Penalty up to ₹250 crore: failure to maintain reasonable security safeguards",
+            "Penalty up to ₹200 crore: failure to notify breaches or violations involving children",
+            "Penalty up to ₹50 crore: other violations of the Act or Rules",
+            # Compliance Timeline
+            "18-month compliance window from November 2025 for full implementation",
         ],
     )
 

@@ -94,6 +94,9 @@ data/.backup/
 *.temp
 *.txt
 
+# Encrypted audit logs (regenerated, contain session data)
+encrypted_logs/*.enc
+
 # ============================================================================
 # 5. Operating Systems
 # ============================================================================
@@ -252,12 +255,12 @@ data/data_dictionary_and_mapping_specifications/~$*.xlsx
 docs/.vision/
 docs/.vision/**
 
-# Documentation Policy: NO .md files except README.md
-# All documentation goes in docs/sphinx/*.rst files
-*.md
-!README.md
-
-# Temporary documentation files
+# ============================================================================
+# 15. Housekeeping & Temporary Documentation
+# ============================================================================
+# Temporary/generated markdown files (NOT project documentation)
+# Project docs are in: README.md, CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, docs/*.md
+CLEANUP_REPORT.md
 FIXES.md
 AUDIT.md
 VERIFICATION.md
@@ -268,3 +271,26 @@ NOTES.md
 *_AUDIT*.md
 *_REPORT*.md
 *_SUMMARY*.md
+
+# =============================================================================
+# MCP Phase 0 - Additional Ignores
+# =============================================================================
+
+# UV lock file (optional - some teams commit this)
+# uv.lock
+
+# Backup files from Phase 0 cleanup
+*.bak
+
+# Local environment overrides
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

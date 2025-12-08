@@ -73,10 +73,14 @@ __all__ = [
 # Optional imports
 try:
     from cryptography.fernet import Fernet
+    # Import AES-256-GCM cipher for improved security
+    from server.security.encryption import AES256GCMCipher, EncryptionError, DecryptionError
 
     CRYPTO_AVAILABLE = True
+    AES256_AVAILABLE = True
 except ImportError:
     CRYPTO_AVAILABLE = False
+    AES256_AVAILABLE = False
     logging.warning("cryptography package not available. Mapping encryption disabled.")
 
 from tqdm import tqdm
@@ -742,35 +746,80 @@ class MappingStore:
     Secure storage for PHI to pseudonym mappings.
 
     Features:
-    - Encrypted storage using Fernet (symmetric encryption)
+    - Encrypted storage using AES-256-GCM (upgraded from Fernet/AES-128-CBC)
     - Separate key management
     - JSON serialization
     - Audit logging
+    - Backward compatibility with Fernet-encrypted files
+    
+    Security Upgrade (2025):
+        This class now uses AES-256-GCM for new encryptions, providing:
+        - 256-bit keys (vs Fernet's 128-bit)
+        - Authenticated encryption (detects tampering)
+        - No padding oracle vulnerabilities
+        
+        Existing Fernet-encrypted files are automatically detected and
+        can still be decrypted for migration purposes.
     """
 
     def __init__(
         self,
         storage_path: Path,
-        encryption_key: bytes | None = None,
+        encryption_key: bytes | str | None = None,
         enable_encryption: bool = True,
+        use_legacy_fernet: bool = False,
     ):
         """
         Initialize mapping store.
 
         Args:
             storage_path: Path to store mapping file
-            encryption_key: Encryption key (generates new if None)
+            encryption_key: Encryption key (generates new if None).
+                           For AES-256-GCM: 32 bytes or base64 string
+                           For legacy Fernet: Fernet key bytes
             enable_encryption: Whether to encrypt mappings
+            use_legacy_fernet: Force use of legacy Fernet (not recommended)
         """
         self.storage_path = Path(storage_path)
         self.enable_encryption = enable_encryption and CRYPTO_AVAILABLE
+        self._use_aes256 = AES256_AVAILABLE and not use_legacy_fernet
 
         if self.enable_encryption:
-            self.encryption_key = encryption_key or Fernet.generate_key()
-            self.cipher = Fernet(self.encryption_key)
+            if self._use_aes256:
+                # Use new AES-256-GCM cipher
+                if encryption_key is None:
+                    self._aes_cipher = AES256GCMCipher.generate()
+                    self.encryption_key = self._aes_cipher.export_key().encode()
+                elif isinstance(encryption_key, str):
+                    self._aes_cipher = AES256GCMCipher.from_key(encryption_key)
+                    self.encryption_key = encryption_key.encode()
+                elif len(encryption_key) == 32:
+                    # Raw 32-byte key
+                    self._aes_cipher = AES256GCMCipher(encryption_key)
+                    self.encryption_key = encryption_key
+                else:
+                    # Try to decode as base64
+                    try:
+                        self._aes_cipher = AES256GCMCipher.from_key(encryption_key.decode())
+                        self.encryption_key = encryption_key
+                    except Exception:
+                        raise ValueError(
+                            "Invalid encryption key format. Provide 32 bytes or base64 string."
+                        )
+                self._fernet_cipher = None
+                logging.info("Using AES-256-GCM encryption for mapping storage")
+            else:
+                # Legacy Fernet mode
+                self.encryption_key = encryption_key or Fernet.generate_key()
+                self._fernet_cipher = Fernet(self.encryption_key)
+                self._aes_cipher = None
+                logging.warning(
+                    "Using legacy Fernet encryption. Consider upgrading to AES-256-GCM."
+                )
         else:
             self.encryption_key = None
-            self.cipher = None
+            self._fernet_cipher = None
+            self._aes_cipher = None
             if enable_encryption:
                 logging.warning(
                     "Encryption requested but cryptography package not available"
@@ -778,6 +827,32 @@ class MappingStore:
 
         self.mappings: dict[str, dict[str, Any]] = {}
         self._load_mappings()
+
+    def _detect_encryption_format(self, data: bytes) -> str:
+        """
+        Detect the encryption format of stored data.
+        
+        Returns:
+            'aes256gcm': AES-256-GCM format (JSON with 'v', 'n', 'c' fields)
+            'fernet': Fernet format (starts with 'gAAAA')
+            'plaintext': Unencrypted JSON
+        """
+        try:
+            # Check for AES-256-GCM format (JSON with version field)
+            decoded = data.decode("utf-8")
+            if decoded.startswith('{"v":'):
+                return "aes256gcm"
+            # Check for Fernet format (base64 starting with gAAAA)
+            if data.startswith(b"gAAAA"):
+                return "fernet"
+            # Try parsing as JSON (plaintext)
+            json.loads(decoded)
+            return "plaintext"
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            # If it starts with gAAAA after decoding, it's Fernet
+            if data.startswith(b"gAAAA"):
+                return "fernet"
+            return "unknown"
 
     def _load_mappings(self) -> None:
         """Load mappings from storage file."""
@@ -788,12 +863,34 @@ class MappingStore:
             with open(self.storage_path, "rb") as f:
                 data = f.read()
 
-            # Decrypt if enabled
-            if self.enable_encryption and self.cipher:
-                data = self.cipher.decrypt(data)
+            # Detect encryption format
+            format_type = self._detect_encryption_format(data)
+            
+            if format_type == "plaintext":
+                # Unencrypted JSON
+                decrypted_data = data
+            elif format_type == "aes256gcm" and self._aes_cipher:
+                # AES-256-GCM encrypted
+                decrypted_data = self._aes_cipher.decrypt(data)
+            elif format_type == "fernet" and self._fernet_cipher:
+                # Legacy Fernet encrypted
+                decrypted_data = self._fernet_cipher.decrypt(data)
+                logging.info(
+                    "Loaded Fernet-encrypted mappings. Consider re-saving to upgrade to AES-256-GCM."
+                )
+            elif self.enable_encryption:
+                logging.error(
+                    f"Cannot decrypt mappings: format={format_type}, "
+                    f"have_aes={self._aes_cipher is not None}, "
+                    f"have_fernet={self._fernet_cipher is not None}"
+                )
+                self.mappings = {}
+                return
+            else:
+                decrypted_data = data
 
             # Parse JSON
-            self.mappings = json.loads(data.decode("utf-8"))
+            self.mappings = json.loads(decrypted_data.decode("utf-8"))
             logging.info(
                 f"Loaded {len(self.mappings)} mappings from {self.storage_path}"
             )
@@ -803,19 +900,29 @@ class MappingStore:
             self.mappings = {}
 
     def save_mappings(self) -> None:
-        """Save mappings to storage file."""
+        """Save mappings to storage file using AES-256-GCM encryption."""
         try:
             # Ensure directory exists
             self.storage_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Serialize to JSON
-            data = json.dumps(self.mappings, indent=2, ensure_ascii=False).encode(
+            json_data = json.dumps(self.mappings, indent=2, ensure_ascii=False).encode(
                 "utf-8"
             )
 
             # Encrypt if enabled
-            if self.enable_encryption and self.cipher:
-                data = self.cipher.encrypt(data)
+            if self.enable_encryption:
+                if self._aes_cipher:
+                    # Use AES-256-GCM (preferred)
+                    payload = self._aes_cipher.encrypt(json_data)
+                    data = payload.to_bytes()
+                elif self._fernet_cipher:
+                    # Fallback to legacy Fernet
+                    data = self._fernet_cipher.encrypt(json_data)
+                else:
+                    data = json_data
+            else:
+                data = json_data
 
             # Write to file
             with open(self.storage_path, "wb") as f:
@@ -826,6 +933,23 @@ class MappingStore:
         except Exception as e:
             logging.exception(f"Failed to save mappings: {e}")
             raise
+    
+    def get_encryption_info(self) -> dict[str, Any]:
+        """
+        Get information about the current encryption configuration.
+        
+        Returns:
+            Dictionary with encryption status and algorithm info
+        """
+        return {
+            "enabled": self.enable_encryption,
+            "algorithm": "AES-256-GCM" if self._aes_cipher else (
+                "Fernet (AES-128-CBC)" if self._fernet_cipher else "None"
+            ),
+            "key_available": self.encryption_key is not None,
+            "storage_path": str(self.storage_path),
+            "mappings_count": len(self.mappings),
+        }
 
     def add_mapping(
         self,

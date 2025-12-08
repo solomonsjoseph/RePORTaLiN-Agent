@@ -152,7 +152,9 @@ def setup_logger(
     file_handler.setFormatter(file_formatter)
 
     # Console handler: behavior depends on simple_mode
-    console_handler = logging.StreamHandler(sys.stdout)
+    # CRITICAL: Use stderr, NOT stdout, for MCP server compatibility.
+    # MCP stdio transport requires stdout to be pure JSON-RPC only.
+    console_handler = logging.StreamHandler(sys.stderr)
 
     if simple_mode:
         # Simple mode: only show SUCCESS, WARNING, ERROR, and CRITICAL

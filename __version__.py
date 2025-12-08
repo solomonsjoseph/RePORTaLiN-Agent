@@ -42,22 +42,22 @@ Examples:
         from __version__ import __version__
 
         print(f"RePORTaLiN-Specialist version {__version__}")
-        # Output: RePORTaLiN-Specialist version 0.0.1
+        # Output: RePORTaLiN-Specialist version 0.0.2
 
     Access from command line::
 
         $ python main.py --version
-        RePORTaLiN-Specialist 0.0.1
+        RePORTaLiN-Specialist 0.0.2
 
     Version tuple is auto-derived from version string::
 
         from __version__ import __version__, __version_info__
 
         print(f"Version: {__version__}")
-        # Output: Version: 0.0.1
+        # Output: Version: 0.0.2
 
         print(f"Version tuple: {__version_info__}")
-        # Output: Version tuple: (0, 0, 1)
+        # Output: Version tuple: (0, 0, 2)
 
         # The tuple is automatically derived, so they're always in sync
         assert __version_info__ == tuple(map(int, __version__.split('.')))
@@ -70,7 +70,7 @@ See Also:
 
 import re
 
-__version__: str = "0.0.2"
+__version__: str = "2.1.0"
 
 # Validate semantic versioning format (MAJOR.MINOR.PATCH)
 if not re.match(r"^\d+\.\d+\.\d+$", __version__):

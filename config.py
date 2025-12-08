@@ -5,18 +5,49 @@ RePORTaLiN-Specialist Configuration Module.
 Centralized configuration management with dynamic dataset detection,
 automatic path resolution, and flexible logging configuration.
 
+This module provides backward compatibility with the legacy configuration
+system while delegating to the new Pydantic-based settings system.
+
 Module:
     config - Configuration management for RePORTaLiN-Specialist project
+
+New Architecture:
+    For new code, prefer using the centralized settings:
+    
+        from scripts.core import get_settings
+        settings = get_settings()
+        
+    This module is maintained for backward compatibility with existing code.
+
+See Also:
+    - scripts/core/settings.py - Pydantic-based settings management
+    - scripts/core/structured_logging.py - Structured logging configuration
 """
 
 import logging
 import os
+import sys
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 # Safe version import with fallback
 try:
     from __version__ import __version__
 except ImportError:
     __version__ = "unknown"
+
+# =============================================================================
+# Try to use new Pydantic settings, fall back to legacy if unavailable
+# =============================================================================
+_USE_NEW_SETTINGS = False
+
+try:
+    from scripts.core.settings import get_settings as _get_pydantic_settings
+    _USE_NEW_SETTINGS = True
+except ImportError:
+    # Pydantic settings not available (missing pydantic-settings)
+    # Fall back to legacy configuration
+    pass
 
 # Constants
 DEFAULT_DATASET_NAME = "RePORTaLiN_sample"
@@ -43,12 +74,54 @@ __all__ = [
     # Public functions
     "ensure_directories",
     "validate_config",
+    "get_settings",
     # Helper functions (used internally during module initialization)
     "get_dataset_folder",
     "normalize_dataset_name",
 ]
 
+
+# =============================================================================
+# Settings Access (New API)
+# =============================================================================
+def get_settings():
+    """Get the centralized settings object.
+    
+    Returns:
+        Settings object from scripts.core.settings if available,
+        or a compatibility wrapper for legacy config.
+        
+    Example:
+        >>> settings = get_settings()
+        >>> print(settings.data_dir)
+    """
+    if _USE_NEW_SETTINGS:
+        return _get_pydantic_settings()
+    else:
+        # Return a simple namespace with legacy config values
+        class LegacySettings:
+            """Compatibility wrapper for legacy configuration."""
+            data_dir = Path(DATA_DIR)
+            results_dir = Path(RESULTS_DIR)
+            dataset_dir = Path(DATASET_DIR)
+            dataset_name = DATASET_NAME
+            log_level = LOG_LEVEL
+            log_name = LOG_NAME
+            
+            @property
+            def logging(self):
+                """Compatibility property for logging settings."""
+                class LoggingSettings:
+                    level = "INFO"
+                    verbose = LOG_LEVEL == logging.DEBUG
+                return LoggingSettings()
+        
+        return LegacySettings()
+
+
+# =============================================================================
 # Project paths
+# =============================================================================
 ROOT_DIR = (
     os.path.dirname(os.path.abspath(__file__))
     if "__file__" in globals()
