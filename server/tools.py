@@ -27,7 +27,7 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import Annotated, Any
 
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field, field_validator
@@ -35,9 +35,6 @@ from pydantic import BaseModel, Field, field_validator
 from server.config import get_settings
 from server.logger import bind_context, clear_context, get_logger
 from shared.constants import SERVER_NAME, SERVER_VERSION
-
-if TYPE_CHECKING:
-    from mcp.server.session import ServerSession
 
 __all__ = [
     "BuildTechnicalRequestInput",
@@ -346,7 +343,7 @@ class BuildTechnicalRequestInput(BaseModel):
 @mcp.tool()
 async def explore_study_metadata(
     input: ExploreStudyMetadataInput,
-    ctx: Context[ServerSession, None],
+    ctx: Context,
 ) -> dict[str, Any]:
     """
     Explore high-level study metadata for feasibility assessment.
@@ -469,7 +466,7 @@ async def explore_study_metadata(
 @mcp.tool()
 async def build_technical_request(
     input: BuildTechnicalRequestInput,
-    ctx: Context[ServerSession, None],
+    ctx: Context,
 ) -> dict[str, Any]:
     """
     Build a formal technical data extraction request (Concept Sheet).
