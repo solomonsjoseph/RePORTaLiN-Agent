@@ -46,7 +46,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 # Import cryptography (required for decryption)
 try:
@@ -92,10 +92,10 @@ class LogDecryptor:
 
     def __init__(
         self,
-        private_key_path: Optional[str | Path] = None,
-        private_key_pem: Optional[bytes] = None,
-        private_key_password: Optional[str] = None,
-        authorized_fingerprints: Optional[list[str]] = None,
+        private_key_path: str | Path | None = None,
+        private_key_pem: bytes | None = None,
+        private_key_password: str | None = None,
+        authorized_fingerprints: list[str] | None = None,
     ) -> None:
         """Initialize the log decryptor.
 
@@ -123,9 +123,9 @@ class LogDecryptor:
 
     def _load_private_key(
         self,
-        key_path: Optional[str | Path],
-        key_pem: Optional[bytes],
-        password: Optional[str],
+        key_path: str | Path | None,
+        key_pem: bytes | None,
+        password: str | None,
     ) -> None:
         """Load and validate the RSA private key."""
         password_bytes = password.encode() if password else None
@@ -262,7 +262,7 @@ class LogDecryptor:
             raise DecryptionError(f"Log file not found: {path}")
 
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 encrypted_data = json.load(f)
 
             content = self._decrypt_content(encrypted_data)
@@ -275,9 +275,9 @@ class LogDecryptor:
         self,
         dir_path: str | Path,
         *,
-        since: Optional[datetime.datetime] = None,
-        until: Optional[datetime.datetime] = None,
-        level: Optional[str] = None,
+        since: datetime.datetime | None = None,
+        until: datetime.datetime | None = None,
+        level: str | None = None,
     ) -> list[dict[str, Any]]:
         """Decrypt all log files in a directory.
 
@@ -336,7 +336,7 @@ def generate_keypair(
     private_key_path: str | Path,
     public_key_path: str | Path,
     key_size: int = 4096,
-    password: Optional[str] = None,
+    password: str | None = None,
 ) -> str:
     """Generate a new RSA keypair for log encryption/decryption.
 
@@ -512,12 +512,12 @@ Key Management:
             password=password if password else None,
         )
 
-        print(f"\nKeys generated:")
+        print("\nKeys generated:")
         print(f"  Private key: {private_path}")
         print(f"  Public key:  {public_path}")
         print(f"  Fingerprint: {fingerprint}")
-        print(f"\nAdd the public key to your MCP server configuration.")
-        print(f"Add this fingerprint to authorized_key_fingerprints in settings.")
+        print("\nAdd the public key to your MCP server configuration.")
+        print("Add this fingerprint to authorized_key_fingerprints in settings.")
         return
 
     # Require path for other operations

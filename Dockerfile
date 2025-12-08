@@ -31,7 +31,12 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Build dependencies with uv
 # -----------------------------------------------------------------------------
-FROM python:3.11-slim-bookworm AS builder
+FROM python:3.13-slim-bookworm AS builder
+
+# Build-time arguments for versioning and provenance
+ARG BUILD_VERSION
+ARG BUILD_DATE
+ARG VCS_REF
 
 # Security: Don't store pip cache, disable version check
 ENV PIP_NO_CACHE_DIR=1 \
@@ -42,18 +47,34 @@ ENV PIP_NO_CACHE_DIR=1 \
 WORKDIR /build
 
 # Install uv - fast Python package installer
+# hadolint ignore=DL3013
 RUN pip install --no-cache-dir uv
 
 # Copy dependency files first for better layer caching
-COPY pyproject.toml .python-version ./
+# README.md is required by pyproject.toml metadata
+COPY pyproject.toml .python-version README.md ./
+
+# Copy minimal source structure needed for package installation
+# uv sync needs these to resolve the local package
+COPY server/__init__.py ./server/
+COPY server/py.typed ./server/
+COPY client/__init__.py ./client/
+COPY client/py.typed ./client/
+COPY shared/__init__.py ./shared/
+COPY shared/py.typed ./shared/
+COPY scripts/__init__.py ./scripts/
+COPY scripts/py.typed ./scripts/
+COPY __version__.py ./
 
 # Create virtual environment and install dependencies with uv
+# UV_PROJECT_ENVIRONMENT tells uv sync to install to /opt/venv
 # --frozen ensures lockfile is used if present (uv.lock)
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 RUN uv venv /opt/venv && \
-    . /opt/venv/bin/activate && \
-    uv sync --frozen --no-dev 2>/dev/null || uv sync --no-dev
+    (uv sync --frozen --no-dev 2>/dev/null || uv sync --no-dev)
 
 # Clean up unnecessary files from venv to minimize attack surface
+# hadolint ignore=SC2015
 RUN find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
     find /opt/venv -type f -name "*.pyc" -delete 2>/dev/null || true && \
     find /opt/venv -type f -name "*.pyo" -delete 2>/dev/null || true && \
@@ -65,17 +86,27 @@ RUN find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || 
 # -----------------------------------------------------------------------------
 # Stage 2: Production image
 # -----------------------------------------------------------------------------
-FROM python:3.11-slim-bookworm AS production
+FROM python:3.13-slim-bookworm AS production
 
-# Security labels (OCI standard)
+# Build-time arguments for OCI labels
+ARG BUILD_VERSION
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Security labels (OCI standard) with build-time provenance
 LABEL org.opencontainers.image.title="RePORTaLiN Specialist MCP Server" \
       org.opencontainers.image.description="Secure MCP Server for RePORT India - PHI Protected" \
       org.opencontainers.image.vendor="RePORTaLiN Team" \
       org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${BUILD_VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.source="https://github.com/reportalin/reportalin-agent" \
       security.policy="no-new-privileges,read-only-rootfs,network-none" \
       data.classification="PHI/PII-Protected"
 
 # Install tini for proper init (handles signals correctly) and curl for healthchecks
+# hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends tini curl && \
     apt-get clean && \
@@ -139,7 +170,10 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 # Use tini as init to handle signals properly (PID 1 zombie reaping)
 # NOTE: server.__main__ handles stdout isolation for JSON-RPC
+# SIGTERM handling: tini forwards signals, Python handles graceful shutdown
 ENTRYPOINT ["/usr/bin/tini", "--", "python", "-m", "server"]
 
 # No CMD needed - stdio_runner handles transport automatically
+# Default grace period for SIGTERM: 10 seconds (Docker default)
+# Override with: docker run --stop-timeout=30
 CMD []

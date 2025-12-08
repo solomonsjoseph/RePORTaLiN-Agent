@@ -11,18 +11,15 @@ Tests cover:
 - Log output format
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
 
 from server.logger import (
-    get_logger,
-    configure_logging,
-    set_request_id,
-    get_request_id,
     bind_context,
     clear_context,
+    configure_logging,
+    get_logger,
+    get_request_id,
+    set_request_id,
 )
-
 
 # =============================================================================
 # Logger Initialization Tests
@@ -61,7 +58,7 @@ class TestRequestId:
         """Test setting and getting request ID."""
         test_id = "test-request-123"
         set_request_id(test_id)
-        
+
         result = get_request_id()
         assert result == test_id
 
@@ -69,7 +66,7 @@ class TestRequestId:
         """Test getting request ID when none is set returns a default."""
         # Clear any existing context first
         clear_context()
-        
+
         result = get_request_id()
         # Should return either None or a generated ID depending on implementation
         assert result is None or isinstance(result, str)
@@ -96,9 +93,9 @@ class TestContextBinding:
     def test_bind_multiple_values(self) -> None:
         """Test binding multiple context values."""
         bind_context(
-            tool="query_database",
+            tool="explore_study_metadata",
             query_length=100,
-            limit=50,
+            site_filter="Pune",
         )
         # Should not raise
 

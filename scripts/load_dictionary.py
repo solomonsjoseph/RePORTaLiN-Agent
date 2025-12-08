@@ -99,7 +99,7 @@ def _split_sheet_into_tables(df: pd.DataFrame) -> list[pd.DataFrame]:
         List of DataFrames, each representing a detected table
     """
     empty_rows = df.index[df.isnull().all(axis=1)].tolist()
-    row_boundaries = [-1] + empty_rows + [df.shape[0]]
+    row_boundaries = [-1, *empty_rows, df.shape[0]]
     horizontal_strips = [
         df.iloc[row_boundaries[i] + 1 : row_boundaries[i + 1]]
         for i in range(len(row_boundaries) - 1)
@@ -111,7 +111,7 @@ def _split_sheet_into_tables(df: pd.DataFrame) -> list[pd.DataFrame]:
         empty_col_indices = [
             i for i, col in enumerate(strip.columns) if strip[col].isnull().all()
         ]
-        col_boundaries = [-1] + empty_col_indices + [len(strip.columns)]
+        col_boundaries = [-1, *empty_col_indices, len(strip.columns)]
         for j in range(len(col_boundaries) - 1):
             start_col, end_col = col_boundaries[j] + 1, col_boundaries[j + 1]
             if start_col < end_col:

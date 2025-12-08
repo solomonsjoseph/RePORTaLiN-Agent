@@ -21,7 +21,7 @@ Usage:
 Output Examples:
     Local (pretty):
         2025-12-05 10:30:00 [info     ] Server started    port=8000 transport=stdio
-    
+
     Production (JSON):
         {"event":"Server started","port":8000,"transport":"stdio","timestamp":"2025-12-05T10:30:00Z","level":"info"}
 
@@ -36,16 +36,18 @@ import logging
 import sys
 from contextvars import ContextVar
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
-from structlog.types import EventDict, Processor, WrappedLogger
+
+if TYPE_CHECKING:
+    from structlog.types import EventDict, Processor, WrappedLogger
 
 __all__ = [
-    "configure_logging",
-    "get_logger",
     "bind_context",
     "clear_context",
+    "configure_logging",
+    "get_logger",
     "get_request_id",
     "set_request_id",
 ]
@@ -60,7 +62,7 @@ _logging_configured = False
 def get_request_id() -> str | None:
     """
     Get the current request ID from context.
-    
+
     Returns:
         The request ID if set, None otherwise
     """
@@ -70,7 +72,7 @@ def get_request_id() -> str | None:
 def set_request_id(request_id: str | None) -> None:
     """
     Set the request ID in context.
-    
+
     Args:
         request_id: The request ID to set, or None to clear
     """
@@ -88,7 +90,7 @@ def add_request_id(
 ) -> EventDict:
     """
     Add request_id to log events from context variable.
-    
+
     This processor automatically includes the current request ID in all
     log events, enabling request tracing across distributed systems.
     """
@@ -105,12 +107,12 @@ def add_service_info(
 ) -> EventDict:
     """
     Add service identification to log events.
-    
+
     Includes service name and version for log aggregation and filtering.
     Uses constants from shared module to ensure consistency.
     """
     from shared.constants import SERVER_NAME, SERVER_VERSION
-    
+
     event_dict.setdefault("service", SERVER_NAME)
     event_dict.setdefault("version", SERVER_VERSION)
     return event_dict
@@ -123,10 +125,10 @@ def filter_sensitive_data(
 ) -> EventDict:
     """
     Filter sensitive data from log events.
-    
+
     Redacts or removes sensitive fields to prevent accidental exposure
     of credentials, tokens, or PHI in logs.
-    
+
     Filtered fields:
         - password, passwd, secret, token, key, auth
         - Any field containing 'credential' or 'authorization'
@@ -136,11 +138,11 @@ def filter_sensitive_data(
         "credential", "authorization", "api_key", "apikey",
         "access_token", "refresh_token", "bearer",
     }
-    
+
     def is_sensitive(key: str) -> bool:
         key_lower = key.lower()
         return any(pattern in key_lower for pattern in sensitive_patterns)
-    
+
     filtered = {}
     for key, value in event_dict.items():
         if is_sensitive(key):
@@ -153,7 +155,7 @@ def filter_sensitive_data(
             }
         else:
             filtered[key] = value
-    
+
     return filtered
 
 
@@ -164,7 +166,7 @@ def add_timestamp(
 ) -> EventDict:
     """
     Add ISO 8601 timestamp to log events.
-    
+
     Uses UTC timezone for consistency across distributed systems.
     """
     event_dict["timestamp"] = datetime.now(timezone.utc).isoformat()
@@ -178,10 +180,10 @@ def add_timestamp(
 def _get_processors(use_json: bool) -> list[Processor]:
     """
     Get the processor chain based on output format.
-    
+
     Args:
         use_json: If True, output JSON; if False, output pretty console format
-        
+
     Returns:
         List of structlog processors
     """
@@ -208,7 +210,7 @@ def _get_processors(use_json: bool) -> list[Processor]:
         # Handle unicode
         structlog.processors.UnicodeDecoder(),
     ]
-    
+
     if use_json:
         # Production: JSON output
         return [
@@ -235,27 +237,27 @@ def configure_logging(
 ) -> None:
     """
     Configure structlog for the application.
-    
+
     This function should be called once at application startup, before
     any logging is performed. It configures both structlog and the
     standard library logging to work together.
-    
+
     Args:
         level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         use_json: If True, use JSON output; if False, use pretty output.
                   If None, auto-detect from settings.
         force: If True, reconfigure even if already configured
-        
+
     Example:
         >>> configure_logging(level="DEBUG", use_json=False)
         >>> logger = get_logger(__name__)
         >>> logger.info("Application started")
     """
     global _logging_configured
-    
+
     if _logging_configured and not force:
         return
-    
+
     # Auto-detect format from settings if not specified
     if use_json is None:
         try:
@@ -266,10 +268,10 @@ def configure_logging(
         except Exception:
             # Fallback to pretty output if settings unavailable
             use_json = False
-    
+
     # Get appropriate processors
     processors = _get_processors(use_json)
-    
+
     # Configure structlog
     # CRITICAL: Use stderr for all log output to avoid corrupting stdio JSON-RPC stream
     structlog.configure(
@@ -281,33 +283,33 @@ def configure_logging(
         logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
         cache_logger_on_first_use=True,
     )
-    
+
     # Also configure standard library logging for third-party libraries
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stderr,
         level=getattr(logging, level.upper(), logging.INFO),
     )
-    
+
     # Reduce noise from verbose libraries
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("asyncio").setLevel(logging.WARNING)
-    
+
     _logging_configured = True
 
 
 def get_logger(name: str | None = None) -> structlog.BoundLogger:
     """
     Get a structured logger instance.
-    
+
     Args:
         name: Logger name (typically __name__ of the calling module)
-        
+
     Returns:
         A bound structlog logger instance
-        
+
     Example:
         >>> logger = get_logger(__name__)
         >>> logger.info("Processing request", user_id=123)
@@ -315,19 +317,19 @@ def get_logger(name: str | None = None) -> structlog.BoundLogger:
     # Ensure logging is configured
     if not _logging_configured:
         configure_logging()
-    
+
     return structlog.get_logger(name)
 
 
 def bind_context(**kwargs: Any) -> None:
     """
     Bind context variables that will be included in all subsequent logs.
-    
+
     Useful for adding request-scoped context like user_id, session_id, etc.
-    
+
     Args:
         **kwargs: Key-value pairs to bind to the logging context
-        
+
     Example:
         >>> bind_context(user_id=123, session_id="abc")
         >>> logger.info("Action performed")  # Includes user_id and session_id
@@ -338,7 +340,7 @@ def bind_context(**kwargs: Any) -> None:
 def clear_context() -> None:
     """
     Clear all bound context variables.
-    
+
     Should be called at the end of request handling to prevent
     context leakage between requests.
     """
@@ -362,7 +364,7 @@ in `server/config.py`, which follows this logic:
 
 2. If `LOG_FORMAT` is 'auto' (the default), the format is determined by
    the `ENVIRONMENT` setting:
-   
+
    - LOCAL or DEVELOPMENT → 'pretty' (colored, human-readable)
    - STAGING or PRODUCTION → 'json' (structured, machine-parseable)
 
@@ -374,7 +376,7 @@ Pretty Format (Local/Development):
     - Human-readable timestamps
     - Exception tracebacks formatted for readability
     - Key-value pairs displayed inline
-    
+
     Example:
     2025-12-05 10:30:00 [info     ] Server started    port=8000 transport=stdio
 
@@ -383,7 +385,7 @@ JSON Format (Staging/Production):
     - ISO 8601 timestamps in UTC
     - All context fields as JSON properties
     - Easy to parse with log aggregation tools (ELK, Datadog, etc.)
-    
+
     Example:
     {"event":"Server started","port":8000,"transport":"stdio","timestamp":"2025-12-05T10:30:00+00:00","level":"info","service":"reportalin-mcp"}
 
@@ -393,10 +395,10 @@ Usage in Code:
 The format switching is automatic. Just use the logger normally:
 
     from server.logger import get_logger, configure_logging
-    
+
     # Configure once at startup (auto-detects environment)
     configure_logging()
-    
+
     # Get logger and use it
     logger = get_logger(__name__)
     logger.info("Server started", port=8000)

@@ -22,13 +22,13 @@ Test Organization:
 Running Tests:
     # All tests
     uv run pytest
-    
+
     # With coverage
     uv run pytest --cov=server --cov=client --cov-report=html
-    
+
     # Security tests only
     uv run pytest -m security -v
-    
+
     # Auth tests only
     uv run pytest -m auth -v
 

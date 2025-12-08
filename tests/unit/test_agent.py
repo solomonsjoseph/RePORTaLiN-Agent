@@ -12,10 +12,10 @@ Note: These tests use mocks to avoid requiring a running server or LLM.
 """
 
 import json
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, patch
 
+import pytest
 from openai.types.chat import (
     ChatCompletion,
     ChatCompletionMessage,
@@ -25,15 +25,12 @@ from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_message_tool_call import Function
 
 from client.agent import (
-    MCPAgent,
     AgentConfig,
-    AgentError,
     AgentConfigError,
+    AgentError,
     AgentExecutionError,
-    run_agent,
-    DEFAULT_SYSTEM_PROMPT,
+    MCPAgent,
 )
-
 
 # =============================================================================
 # Test Fixtures
@@ -125,19 +122,19 @@ def create_completion_response(
             )
             for tc in tool_calls
         ]
-    
+
     message = ChatCompletionMessage(
         role="assistant",
         content=content,
         tool_calls=message_tool_calls,
     )
-    
+
     choice = Choice(
         index=0,
         message=message,
         finish_reason="stop" if not tool_calls else "tool_calls",
     )
-    
+
     return ChatCompletion(
         id="test-completion-id",
         choices=[choice],
@@ -216,14 +213,14 @@ class TestAgentConfig:
             llm_base_url="http://localhost:11434/v1",
         )
         assert config.provider_name == "Ollama"
-        
+
         # Generic localhost
         config = AgentConfig(
             llm_api_key="test",
             llm_base_url="http://localhost:1234/v1",
         )
         assert config.provider_name == "Local LLM"
-        
+
         # Custom remote
         config = AgentConfig(
             llm_api_key="test",
@@ -259,19 +256,19 @@ class TestAgentInitialization:
             mcp_client=mock_mcp_client,
             llm_client=mock_llm_client,
         )
-        
+
         await agent.connect()
-        
+
         assert agent._connected is True
         mock_mcp_client.connect.assert_called_once()
         mock_mcp_client.get_tools_for_openai.assert_called_once()
         assert len(agent._tools) == 2
         assert agent._tool_names == ["health_check", "query_database"]
-        
+
         # Check system prompt was added
         assert len(agent.messages) == 1
         assert agent.messages[0]["role"] == "system"
-        
+
         await agent.close()
 
     @pytest.mark.asyncio
@@ -287,10 +284,10 @@ class TestAgentInitialization:
             mcp_client=mock_mcp_client,
             llm_client=mock_llm_client,
         )
-        
+
         async with agent:
             assert agent._connected is True
-        
+
         mock_mcp_client.close.assert_called_once()
 
     @pytest.mark.asyncio
@@ -306,10 +303,10 @@ class TestAgentInitialization:
             mcp_client=mock_mcp_client,
             llm_client=mock_llm_client,
         )
-        
+
         await agent.connect()
         await agent.close()
-        
+
         assert agent._connected is False
         mock_mcp_client.close.assert_called_once()
         mock_llm_client.close.assert_called_once()
@@ -334,16 +331,16 @@ class TestReActLoop:
         mock_llm_client.chat.completions.create = AsyncMock(
             return_value=create_completion_response("The system is healthy!")
         )
-        
+
         agent = MCPAgent(
             sample_config,
             mcp_client=mock_mcp_client,
             llm_client=mock_llm_client,
         )
-        
+
         async with agent:
             response = await agent.run("Check the status")
-        
+
         assert response == "The system is healthy!"
         assert len(agent.messages) == 3  # system + user + assistant
 
@@ -369,16 +366,16 @@ class TestReActLoop:
                 create_completion_response("The system is healthy based on the check."),
             ]
         )
-        
+
         agent = MCPAgent(
             sample_config,
             mcp_client=mock_mcp_client,
             llm_client=mock_llm_client,
         )
-        
+
         async with agent:
             response = await agent.run("Check the health")
-        
+
         assert "healthy" in response.lower()
         mock_mcp_client.execute_tool.assert_called_once_with("health_check", {})
 
@@ -411,20 +408,20 @@ class TestReActLoop:
                 create_completion_response("Both checks completed successfully."),
             ]
         )
-        
+
         mock_mcp_client.execute_tool = AsyncMock(
             side_effect=['{"status": "healthy"}', '[{"id": 1, "name": "test"}]']
         )
-        
+
         agent = MCPAgent(
             sample_config,
             mcp_client=mock_mcp_client,
             llm_client=mock_llm_client,
         )
-        
+
         async with agent:
-            response = await agent.run("Check health and query users")
-        
+            await agent.run("Check health and query users")
+
         assert mock_mcp_client.execute_tool.call_count == 2
 
     @pytest.mark.asyncio
@@ -446,22 +443,22 @@ class TestReActLoop:
                 }],
             )
         )
-        
+
         config = AgentConfig(
             llm_api_key="test",
             max_iterations=3,  # Low limit for testing
         )
-        
+
         agent = MCPAgent(
             config,
             mcp_client=mock_mcp_client,
             llm_client=mock_llm_client,
         )
-        
+
         async with agent:
             with pytest.raises(AgentExecutionError) as exc_info:
                 await agent.run("Do something")
-        
+
         assert "maximum iterations" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -471,10 +468,10 @@ class TestReActLoop:
     ) -> None:
         """Test that run() raises error if not connected."""
         agent = MCPAgent(sample_config)
-        
+
         with pytest.raises(AgentError) as exc_info:
             await agent.run("Test prompt")
-        
+
         assert "not connected" in str(exc_info.value).lower()
 
 
@@ -496,16 +493,16 @@ class TestMessageHistory:
         mock_llm_client.chat.completions.create = AsyncMock(
             return_value=create_completion_response("Response 1")
         )
-        
+
         agent = MCPAgent(
             sample_config,
             mcp_client=mock_mcp_client,
             llm_client=mock_llm_client,
         )
-        
+
         async with agent:
             await agent.run("First prompt")
-            
+
             # History should have: system + user + assistant
             assert len(agent.messages) == 3
             assert agent.messages[0]["role"] == "system"
@@ -533,16 +530,16 @@ class TestMessageHistory:
                 create_completion_response("Done!"),
             ]
         )
-        
+
         agent = MCPAgent(
             sample_config,
             mcp_client=mock_mcp_client,
             llm_client=mock_llm_client,
         )
-        
+
         async with agent:
             await agent.run("Check health")
-            
+
             # Find tool result message
             tool_messages = [m for m in agent.messages if m.get("role") == "tool"]
             assert len(tool_messages) == 1
@@ -559,19 +556,19 @@ class TestMessageHistory:
         mock_llm_client.chat.completions.create = AsyncMock(
             return_value=create_completion_response("Response")
         )
-        
+
         agent = MCPAgent(
             sample_config,
             mcp_client=mock_mcp_client,
             llm_client=mock_llm_client,
         )
-        
+
         async with agent:
             await agent.run("Test")
             assert len(agent.messages) == 3
-            
+
             agent.reset_conversation()
-            
+
             # Should only have system prompt
             assert len(agent.messages) == 1
             assert agent.messages[0]["role"] == "system"
@@ -593,7 +590,7 @@ class TestErrorHandling:
     ) -> None:
         """Test that tool execution errors are handled gracefully."""
         from client.mcp_client import MCPToolExecutionError
-        
+
         mock_llm_client.chat.completions.create = AsyncMock(
             side_effect=[
                 create_completion_response(
@@ -607,7 +604,7 @@ class TestErrorHandling:
                 create_completion_response("The query failed."),
             ]
         )
-        
+
         # Make tool execution fail
         mock_mcp_client.execute_tool = AsyncMock(
             side_effect=MCPToolExecutionError(
@@ -615,13 +612,13 @@ class TestErrorHandling:
                 tool_name="query_database",
             )
         )
-        
+
         agent = MCPAgent(
             sample_config,
             mcp_client=mock_mcp_client,
             llm_client=mock_llm_client,
         )
-        
+
         async with agent:
             # Should not raise - error is captured and sent to LLM
             response = await agent.run("Query the database")
@@ -638,17 +635,17 @@ class TestErrorHandling:
         mock_llm_client.chat.completions.create = AsyncMock(
             side_effect=Exception("API rate limit exceeded")
         )
-        
+
         agent = MCPAgent(
             sample_config,
             mcp_client=mock_mcp_client,
             llm_client=mock_llm_client,
         )
-        
+
         async with agent:
             with pytest.raises(AgentExecutionError) as exc_info:
                 await agent.run("Test")
-        
+
         assert "rate limit" in str(exc_info.value).lower()
 
 
@@ -694,25 +691,25 @@ class TestIntegration:
                 ),
             ]
         )
-        
+
         mock_mcp_client.execute_tool = AsyncMock(
             side_effect=[
                 '{"status": "healthy", "version": "2.0.0"}',
                 '[{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]',
             ]
         )
-        
+
         agent = MCPAgent(
             sample_config,
             mcp_client=mock_mcp_client,
             llm_client=mock_llm_client,
         )
-        
+
         async with agent:
             response = await agent.run(
                 "Check the system status and then query the users table"
             )
-        
+
         assert "healthy" in response.lower()
         assert "users" in response.lower()
         assert mock_mcp_client.execute_tool.call_count == 2

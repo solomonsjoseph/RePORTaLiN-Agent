@@ -143,3 +143,34 @@ docker-compose*.yml
 mcp_server/
 *.bak
 *.orig
+
+# -----------------------------------------------------------------------------
+# Additional Python/Build Artifacts (Best Practices Update 2025)
+# -----------------------------------------------------------------------------
+*.pyo
+*.pyd
+.Python
+pip-wheel-metadata/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+htmlcov/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytype/
+cython_debug/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Environments
+.pyenv/
+poetry.lock
+
+# tmp directory
+tmp/

@@ -40,12 +40,12 @@ Usage:
     >>> agent = await MCPAgent.create()
     >>> response = await agent.run("Check the system status")
     >>> await agent.close()
-    
+
     # Using context manager (recommended)
     >>> async with MCPAgent.create() as agent:
     ...     response = await agent.run("Query the database")
     ...     print(response)
-    
+
     # Command line
     $ uv run python -m client.agent "Your prompt here"
 """
@@ -57,31 +57,32 @@ import json
 import os
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
-from openai.types.chat import (
-    ChatCompletionMessage,
-    ChatCompletionMessageParam,
-    ChatCompletionMessageToolCall,
-)
 
 from client.mcp_client import (
-    UniversalMCPClient,
-    MCPConnectionError,
     MCPAuthenticationError,
+    MCPConnectionError,
     MCPToolExecutionError,
+    UniversalMCPClient,
 )
 
+if TYPE_CHECKING:
+    from openai.types.chat import (
+        ChatCompletionMessage,
+        ChatCompletionMessageParam,
+        ChatCompletionMessageToolCall,
+    )
+
 __all__ = [
-    "AgentConfig",
-    "MCPAgent",
-    "AgentError",
-    "AgentConfigError",
-    "AgentExecutionError",
     "DEFAULT_SYSTEM_PROMPT",
+    "AgentConfig",
+    "AgentConfigError",
+    "AgentError",
+    "AgentExecutionError",
+    "MCPAgent",
     "run_agent",
 ]
 
@@ -113,10 +114,10 @@ class AgentExecutionError(AgentError):
 class AgentConfig:
     """
     Configuration for the MCP Agent.
-    
+
     Loads settings from environment variables with sensible defaults.
     Supports both OpenAI API and local LLMs via base_url override.
-    
+
     Attributes:
         llm_api_key: API key for the LLM provider (required for OpenAI)
         llm_base_url: Custom base URL for LLM API (enables Ollama support)
@@ -126,7 +127,7 @@ class AgentConfig:
         max_iterations: Maximum tool call iterations to prevent infinite loops
         temperature: LLM temperature for response generation
         system_prompt: System prompt defining agent behavior
-        
+
     Environment Variables:
         LLM_API_KEY: API key (defaults to OPENAI_API_KEY if not set)
         LLM_BASE_URL: Optional base URL for local LLMs (e.g., http://localhost:11434/v1)
@@ -134,7 +135,7 @@ class AgentConfig:
         MCP_SERVER_URL: MCP server endpoint (default: http://localhost:8000/mcp/sse)
         MCP_AUTH_TOKEN: Authentication token for MCP server
     """
-    
+
     llm_api_key: str
     llm_base_url: str | None = None
     llm_model: str = "gpt-4o-mini"
@@ -143,42 +144,42 @@ class AgentConfig:
     max_iterations: int = 10
     temperature: float = 0.7
     system_prompt: str = field(default_factory=lambda: DEFAULT_SYSTEM_PROMPT)
-    
+
     @classmethod
-    def from_env(cls) -> "AgentConfig":
+    def from_env(cls) -> AgentConfig:
         """
         Create configuration from environment variables.
-        
+
         Loads .env file if present, then reads configuration from environment.
-        
+
         Returns:
             AgentConfig instance with loaded settings
-            
+
         Raises:
             AgentConfigError: If required configuration is missing
         """
         # Load .env file if present
         load_dotenv()
-        
+
         # Get API key (try LLM_API_KEY first, then OPENAI_API_KEY)
         api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
-        
+
         # Get base URL (if set, enables local LLM support)
         base_url = os.getenv("LLM_BASE_URL")
-        
+
         # For local LLMs, API key might not be required
         if not api_key and not base_url:
             raise AgentConfigError(
                 "LLM_API_KEY or OPENAI_API_KEY must be set when not using a local LLM. "
                 "Set LLM_BASE_URL for local LLM support (e.g., http://localhost:11434/v1)"
             )
-        
+
         # Get MCP auth token
         mcp_token = os.getenv("MCP_AUTH_TOKEN") or ""
         if not mcp_token:
             # In development, warn but don't fail
             print("⚠️  Warning: MCP_AUTH_TOKEN not set. Server may reject requests.")
-        
+
         return cls(
             llm_api_key=api_key,
             llm_base_url=base_url if base_url else None,
@@ -188,12 +189,12 @@ class AgentConfig:
             max_iterations=int(os.getenv("AGENT_MAX_ITERATIONS", "10")),
             temperature=float(os.getenv("AGENT_TEMPERATURE", "0.7")),
         )
-    
+
     @property
     def is_local_llm(self) -> bool:
         """Check if using a local LLM (Ollama, etc.)."""
         return self.llm_base_url is not None
-    
+
     @property
     def provider_name(self) -> str:
         """Get a human-readable provider name."""
@@ -233,10 +234,10 @@ Always prioritize accuracy over speed. Use tools to verify information rather th
 class MCPAgent:
     """
     MCP Agent implementing the ReAct (Reasoning + Action) pattern.
-    
+
     This agent connects an LLM to MCP tools, enabling autonomous task
     completion through iterative reasoning and tool execution.
-    
+
     The ReAct Loop:
         1. User provides a prompt
         2. Agent sends prompt + available tools to LLM
@@ -246,20 +247,20 @@ class MCPAgent:
            b. Append results to conversation history
            c. Send updated history back to LLM
         5. Repeat until LLM provides final response (no tool calls)
-    
+
     Attributes:
         config: Agent configuration
         mcp_client: Universal MCP Client for server communication
         llm_client: AsyncOpenAI client for LLM calls
         messages: Conversation history
-        
+
     Example:
         >>> config = AgentConfig.from_env()
         >>> async with MCPAgent(config) as agent:
         ...     response = await agent.run("Check the system status")
         ...     print(response)
     """
-    
+
     def __init__(
         self,
         config: AgentConfig,
@@ -268,7 +269,7 @@ class MCPAgent:
     ) -> None:
         """
         Initialize the MCP Agent.
-        
+
         Args:
             config: Agent configuration
             mcp_client: Optional pre-configured MCP client
@@ -282,27 +283,27 @@ class MCPAgent:
         # with ChatCompletionToolParam but mypy can't verify this
         self._tools: list[Any] = []
         self._tool_names: list[str] = []
-        
+
         # Conversation history
         self.messages: list[ChatCompletionMessageParam] = []
-    
+
     @classmethod
     async def create(
         cls,
         config: AgentConfig | None = None,
-    ) -> "MCPAgent":
+    ) -> MCPAgent:
         """
         Factory method to create and initialize an agent.
-        
+
         This is the recommended way to create an agent as it handles
         async initialization properly.
-        
+
         Args:
             config: Optional configuration (loads from env if not provided)
-            
+
         Returns:
             Initialized MCPAgent ready for use
-            
+
         Example:
             >>> agent = await MCPAgent.create()
             >>> try:
@@ -312,20 +313,20 @@ class MCPAgent:
         """
         if config is None:
             config = AgentConfig.from_env()
-        
+
         agent = cls(config)
         await agent.connect()
         return agent
-    
+
     # =========================================================================
     # Context Manager Protocol
     # =========================================================================
-    
-    async def __aenter__(self) -> "MCPAgent":
+
+    async def __aenter__(self) -> MCPAgent:
         """Enter async context and connect to services."""
         await self.connect()
         return self
-    
+
     async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
@@ -334,35 +335,35 @@ class MCPAgent:
     ) -> None:
         """Exit async context and cleanup resources."""
         await self.close()
-    
+
     # =========================================================================
     # Connection Lifecycle
     # =========================================================================
-    
+
     async def connect(self) -> None:
         """
         Connect to MCP server and initialize LLM client.
-        
+
         This method:
         1. Creates and connects the MCP client
         2. Fetches available tools from the server
         3. Initializes the LLM client
         4. Sets up the system prompt
-        
+
         Raises:
             MCPConnectionError: If MCP server connection fails
             MCPAuthenticationError: If MCP authentication fails
         """
         if self._connected:
             return
-        
+
         # Initialize MCP client if not provided
         if self._mcp_client is None:
             self._mcp_client = UniversalMCPClient(
                 server_url=self.config.mcp_server_url,
                 auth_token=self.config.mcp_auth_token,
             )
-        
+
         # Connect to MCP server
         try:
             await self._mcp_client.connect()
@@ -372,62 +373,62 @@ class MCPAgent:
         except MCPConnectionError as e:
             print(f"❌ Failed to connect to MCP server: {e}")
             raise
-        
+
         # Fetch available tools
         self._tools = await self._mcp_client.get_tools_for_openai()
         self._tool_names = [t["function"]["name"] for t in self._tools]
-        
+
         # Initialize LLM client if not provided
         if self._llm_client is None:
             client_kwargs: dict[str, Any] = {}
-            
+
             if self.config.llm_api_key:
                 client_kwargs["api_key"] = self.config.llm_api_key
-            
+
             if self.config.llm_base_url:
                 client_kwargs["base_url"] = self.config.llm_base_url
                 # For local LLMs, API key might be a placeholder
                 if not self.config.llm_api_key:
                     client_kwargs["api_key"] = "ollama"  # Placeholder for local LLMs
-            
+
             self._llm_client = AsyncOpenAI(**client_kwargs)
-        
+
         # Initialize conversation with system prompt
         self.messages = [
             {"role": "system", "content": self.config.system_prompt}
         ]
-        
+
         self._connected = True
-        
+
         # Log connection success
         print(f"🔌 Connected to MCP Server ({self.config.mcp_server_url})")
         print(f"🧠 LLM Provider: {self.config.provider_name} ({self.config.llm_model})")
         print(f"🛠️  Tools loaded: {self._tool_names}")
-    
+
     async def close(self) -> None:
         """
         Close connections and cleanup resources.
-        
+
         Safe to call multiple times.
         """
         if self._mcp_client is not None:
             await self._mcp_client.close()
-        
+
         if self._llm_client is not None:
             await self._llm_client.close()
-        
+
         self._connected = False
         print("👋 Agent disconnected")
-    
+
     def _ensure_connected(self) -> None:
         """Verify agent is connected."""
         if not self._connected:
             raise AgentError("Agent not connected. Call connect() first.")
-    
+
     # =========================================================================
     # ReAct Loop
     # =========================================================================
-    
+
     async def run(
         self,
         user_prompt: str,
@@ -436,45 +437,45 @@ class MCPAgent:
     ) -> str:
         """
         Execute the ReAct loop for a user prompt.
-        
+
         This is the main entry point for agent interaction. It:
         1. Adds the user prompt to conversation history
         2. Calls the LLM with available tools
         3. Processes any tool calls iteratively
         4. Returns the final response
-        
+
         Args:
             user_prompt: The user's input/question
             stream: Whether to stream the response (not yet implemented)
-            
+
         Returns:
             The agent's final response as a string
-            
+
         Raises:
             AgentError: If not connected
             AgentExecutionError: If execution fails
         """
         self._ensure_connected()
-        
+
         print(f"\n{'='*60}")
         print(f"📝 User: {user_prompt}")
         print(f"{'='*60}\n")
-        
+
         # Add user message to history
         self.messages.append({"role": "user", "content": user_prompt})
-        
+
         iteration = 0
-        
+
         while iteration < self.config.max_iterations:
             iteration += 1
             print(f"🔄 Iteration {iteration}/{self.config.max_iterations}")
-            
+
             # Step A: Call LLM with tools
             response = await self._call_llm()
-            
+
             # Get the assistant message
             assistant_message = response.choices[0].message
-            
+
             # Check for tool calls
             if assistant_message.tool_calls:
                 # Step B: Handle tool calls
@@ -482,38 +483,38 @@ class MCPAgent:
             else:
                 # No tool calls - we have the final response
                 final_response = assistant_message.content or ""
-                
+
                 # Add assistant response to history
                 self.messages.append({
                     "role": "assistant",
                     "content": final_response,
                 })
-                
+
                 print(f"\n{'='*60}")
                 print(f"🤖 Agent: {final_response}")
                 print(f"{'='*60}\n")
-                
+
                 return final_response
-        
+
         # Max iterations reached
         raise AgentExecutionError(
             f"Agent reached maximum iterations ({self.config.max_iterations}) "
             "without completing the task. The task may be too complex or stuck in a loop."
         )
-    
+
     async def _call_llm(self) -> Any:
         """
         Make a call to the LLM with current conversation history and tools.
-        
+
         Returns:
             The LLM ChatCompletion response object
-            
+
         Note:
             Return type is Any due to OpenAI SDK's complex type unions.
             The actual return is always ChatCompletion when stream=False.
         """
         assert self._llm_client is not None
-        
+
         try:
             response = await self._llm_client.chat.completions.create(
                 model=self.config.llm_model,
@@ -523,28 +524,28 @@ class MCPAgent:
                 temperature=self.config.temperature,
             )
             return response
-            
+
         except Exception as e:
             raise AgentExecutionError(f"LLM call failed: {e}") from e
-    
+
     async def _handle_tool_calls(
         self,
         assistant_message: ChatCompletionMessage,
     ) -> None:
         """
         Process tool calls from the LLM response.
-        
+
         This method:
         1. Adds the assistant's tool call request to history
         2. Executes each tool via MCP
         3. Adds tool results to history
-        
+
         Args:
             assistant_message: The assistant message containing tool calls
         """
         assert self._mcp_client is not None
         assert assistant_message.tool_calls is not None
-        
+
         # Add assistant message with tool calls to history
         # We need to serialize tool_calls for the message history
         # Note: We filter to only function-type tool calls (not custom)
@@ -560,56 +561,56 @@ class MCPAgent:
                         "arguments": tc.function.arguments,
                     },
                 })
-        
+
         self.messages.append({
             "role": "assistant",
             "content": assistant_message.content,
             "tool_calls": tool_calls_serialized,
         })
-        
+
         # Process each tool call
         for tool_call in assistant_message.tool_calls:
             # Only execute function-type tool calls
             if hasattr(tool_call, 'function') and tool_call.function is not None:
                 await self._execute_tool_call(tool_call)
-    
+
     async def _execute_tool_call(
         self,
         tool_call: ChatCompletionMessageToolCall,
     ) -> None:
         """
         Execute a single tool call and add result to history.
-        
+
         Args:
             tool_call: The tool call to execute
         """
         assert self._mcp_client is not None
-        
+
         tool_name = tool_call.function.name
         tool_call_id = tool_call.id
-        
+
         # Parse arguments
         try:
             arguments = json.loads(tool_call.function.arguments)
         except json.JSONDecodeError:
             arguments = {}
-        
+
         print(f"🛠️  Agent invokes tool: {tool_name}")
         print(f"   Args: {json.dumps(arguments, indent=2)}")
-        
+
         # Execute the tool
         try:
             result = await self._mcp_client.execute_tool(tool_name, arguments)
             print(f"   ✅ Result: {result[:200]}{'...' if len(result) > 200 else ''}")
-            
+
         except MCPToolExecutionError as e:
             result = f"Tool execution failed: {e}"
             print(f"   ❌ Error: {result}")
-            
+
         except Exception as e:
             result = f"Unexpected error: {e}"
             print(f"   ❌ Error: {result}")
-        
+
         # Add tool result to history
         # Critical: Use the correct tool_call_id for proper LLM correlation
         self.messages.append({
@@ -617,26 +618,26 @@ class MCPAgent:
             "tool_call_id": tool_call_id,
             "content": result,
         })
-    
+
     # =========================================================================
     # Utility Methods
     # =========================================================================
-    
+
     def reset_conversation(self) -> None:
         """
         Reset conversation history, keeping only the system prompt.
-        
+
         Use this to start a new conversation without reconnecting.
         """
         self.messages = [
             {"role": "system", "content": self.config.system_prompt}
         ]
         print("🔄 Conversation reset")
-    
+
     def get_conversation_history(self) -> list[dict[str, Any]]:
         """
         Get the current conversation history.
-        
+
         Returns:
             Copy of the messages list
         """
@@ -653,13 +654,13 @@ async def run_agent(
 ) -> str:
     """
     Run the agent with a given prompt.
-    
+
     This is a convenience function for running the agent programmatically.
-    
+
     Args:
         prompt: User prompt (uses default test prompt if not provided)
         config: Optional configuration (loads from env if not provided)
-        
+
     Returns:
         The agent's response
     """
@@ -669,11 +670,11 @@ async def run_agent(
             "Check the system status, and if online, "
             "run a select query on the 'users' table."
         )
-    
+
     # Load config if not provided
     if config is None:
         config = AgentConfig.from_env()
-    
+
     # Run with proper cleanup
     agent = MCPAgent(config)
     try:
@@ -687,11 +688,11 @@ async def run_agent(
 async def main() -> int:
     """
     CLI entry point for the agent.
-    
+
     Usage:
         uv run python -m client.agent "Your prompt here"
         uv run python -m client.agent  # Uses default test prompt
-    
+
     Returns:
         Exit code (0 for success, 1 for error)
     """
@@ -701,31 +702,31 @@ async def main() -> int:
     else:
         prompt = None
         print("ℹ️  No prompt provided, using default test prompt")
-    
+
     try:
         await run_agent(prompt)
         return 0
-        
+
     except AgentConfigError as e:
         print(f"❌ Configuration error: {e}")
         return 1
-        
+
     except MCPConnectionError as e:
         print(f"❌ MCP connection error: {e}")
         return 1
-        
+
     except MCPAuthenticationError as e:
         print(f"❌ MCP authentication error: {e}")
         return 1
-        
+
     except AgentExecutionError as e:
         print(f"❌ Agent execution error: {e}")
         return 1
-        
+
     except KeyboardInterrupt:
         print("\n👋 Agent interrupted by user")
         return 0
-        
+
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
         return 1

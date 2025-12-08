@@ -27,7 +27,7 @@ Usage:
     >>> from client import UniversalMCPClient
     >>> # Or use the canonical Phase 3 import:
     >>> from client.universal_client import UniversalMCPClient
-    >>> 
+    >>>
     >>> # Direct MCP client usage
     >>> async with UniversalMCPClient(
     ...     server_url="http://localhost:8000/mcp/sse",
@@ -35,7 +35,7 @@ Usage:
     ... ) as client:
     ...     tools = await client.get_tools_for_openai()
     ...     result = await client.execute_tool("health_check", {})
-    >>> 
+    >>>
     >>> # Agent usage (recommended for LLM integration)
     >>> from client import MCPAgent
     >>> async with await MCPAgent.create() as agent:
@@ -44,48 +44,48 @@ Usage:
 """
 
 # Primary imports from mcp_client (implementation)
+from client.agent import (
+    DEFAULT_SYSTEM_PROMPT,
+    AgentConfig,
+    AgentConfigError,
+    AgentError,
+    AgentExecutionError,
+    MCPAgent,
+    run_agent,
+)
 from client.mcp_client import (
-    UniversalMCPClient,
+    AnthropicTool,
+    MCPAuthenticationError,
     MCPClientError,
     MCPConnectionError,
-    MCPAuthenticationError,
-    MCPToolExecutionError,
     MCPRetryConfig,
+    MCPToolExecutionError,
     OpenAITool,
-    AnthropicTool,
+    UniversalMCPClient,
     create_client,
-)
-from client.agent import (
-    MCPAgent,
-    AgentConfig,
-    AgentError,
-    AgentConfigError,
-    AgentExecutionError,
-    DEFAULT_SYSTEM_PROMPT,
-    run_agent,
 )
 
 __all__ = [
-    # Main client class
-    "UniversalMCPClient",
+    # Constants
+    "DEFAULT_SYSTEM_PROMPT",
+    "AgentConfig",
+    "AgentConfigError",
+    "AgentError",
+    "AgentExecutionError",
+    "AnthropicTool",
     # Agent classes
     "MCPAgent",
-    "AgentConfig",
-    # Configuration
-    "MCPRetryConfig",
+    "MCPAuthenticationError",
     # Exception classes
     "MCPClientError",
     "MCPConnectionError",
-    "MCPAuthenticationError",
+    # Configuration
+    "MCPRetryConfig",
     "MCPToolExecutionError",
-    "AgentError",
-    "AgentConfigError",
-    "AgentExecutionError",
     # Type definitions
     "OpenAITool",
-    "AnthropicTool",
-    # Constants
-    "DEFAULT_SYSTEM_PROMPT",
+    # Main client class
+    "UniversalMCPClient",
     # Convenience functions
     "create_client",
     "run_agent",

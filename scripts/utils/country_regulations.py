@@ -47,14 +47,14 @@ from pathlib import Path
 from typing import Any
 
 __all__ = [
-    # Enums
-    "DataFieldType",
-    "PrivacyLevel",
-    # Data Classes
-    "DataField",
     "CountryRegulation",
     # Main Manager Class
     "CountryRegulationManager",
+    # Data Classes
+    "DataField",
+    # Enums
+    "DataFieldType",
+    "PrivacyLevel",
     # Helper Function
     "get_common_fields",
 ]

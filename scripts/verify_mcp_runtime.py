@@ -12,10 +12,10 @@ This script acts as a mock MCP client to verify the server can:
 Usage:
     # Run with uv (recommended)
     uv run python scripts/verify_mcp_runtime.py
-    
+
     # Run with verbose output
     uv run python scripts/verify_mcp_runtime.py --verbose
-    
+
     # Run with custom timeout
     uv run python scripts/verify_mcp_runtime.py --timeout 30
 
@@ -101,7 +101,7 @@ class TestResult:
     passed: bool
     message: str
     details: dict[str, Any] | None = None
-    
+
     def __str__(self) -> str:
         status = "✅ PASS" if self.passed else "❌ FAIL"
         return f"{status}: {self.name} - {self.message}"
@@ -114,11 +114,11 @@ class TestResult:
 class MCPRuntimeVerifier:
     """
     Mock MCP client that verifies server compliance.
-    
+
     This class launches the server as a subprocess and communicates
     via stdin/stdout JSON-RPC, mimicking how Claude Desktop connects.
     """
-    
+
     def __init__(
         self,
         timeout: float = 15.0,
@@ -130,17 +130,17 @@ class MCPRuntimeVerifier:
         self.env_file = env_file
         self.process: subprocess.Popen | None = None
         self.results: list[TestResult] = []
-    
+
     def log(self, message: str) -> None:
         """Log message if verbose mode is enabled."""
         if self.verbose:
             print(f"[VERIFIER] {message}", file=sys.stderr)
-    
+
     def _load_test_env(self) -> dict[str, str]:
         """Load environment variables from test env file."""
         env = os.environ.copy()
         env_path = PROJECT_ROOT / self.env_file
-        
+
         if env_path.exists():
             self.log(f"Loading environment from {env_path}")
             with open(env_path) as f:
@@ -155,18 +155,18 @@ class MCPRuntimeVerifier:
             env["ENVIRONMENT"] = "local"
             env["MCP_AUTH_ENABLED"] = "false"
             env["LOG_LEVEL"] = "WARNING"
-        
+
         # Force stdio transport
         env["MCP_TRANSPORT"] = "stdio"
-        
+
         return env
-    
+
     def _start_server(self) -> bool:
         """Start the MCP server subprocess."""
         self.log("Starting MCP server subprocess...")
-        
+
         env = self._load_test_env()
-        
+
         try:
             self.process = subprocess.Popen(
                 ["uv", "run", "python", "-m", "server", "--transport", "stdio"],
@@ -178,10 +178,10 @@ class MCPRuntimeVerifier:
                 text=True,
                 bufsize=1,  # Line buffered
             )
-            
+
             # Give server a moment to start
             time.sleep(0.5)
-            
+
             # Check if process crashed immediately
             if self.process.poll() is not None:
                 stderr = self.process.stderr.read() if self.process.stderr else ""
@@ -192,10 +192,10 @@ class MCPRuntimeVerifier:
                     details={"stderr": stderr[:1000]},
                 ))
                 return False
-            
+
             self.log("Server process started successfully")
             return True
-            
+
         except FileNotFoundError:
             self.results.append(TestResult(
                 name="Server Startup",
@@ -210,23 +210,22 @@ class MCPRuntimeVerifier:
                 message=f"Failed to start server: {e}",
             ))
             return False
-    
+
     def _send_request(self, request: dict[str, Any]) -> dict[str, Any] | None:
         """Send a JSON-RPC request and read the response."""
         if not self.process or not self.process.stdin or not self.process.stdout:
             return None
-        
+
         request_json = json.dumps(request)
         self.log(f"Sending: {request_json[:100]}...")
-        
+
         try:
             # Send request with newline
             self.process.stdin.write(request_json + "\n")
             self.process.stdin.flush()
-            
+
             # Read response (with timeout)
-            import select
-            
+
             # Wait for data to be available
             start_time = time.time()
             while time.time() - start_time < self.timeout:
@@ -235,7 +234,7 @@ class MCPRuntimeVerifier:
                     stderr = self.process.stderr.read() if self.process.stderr else ""
                     self.log(f"Process died. Stderr: {stderr[:500]}")
                     return None
-                
+
                 # Try to read a line
                 try:
                     # Use a shorter timeout for select
@@ -244,7 +243,7 @@ class MCPRuntimeVerifier:
                     sel.register(self.process.stdout, selectors.EVENT_READ)
                     events = sel.select(timeout=0.5)
                     sel.close()
-                    
+
                     if events:
                         line = self.process.stdout.readline()
                         if line:
@@ -253,20 +252,20 @@ class MCPRuntimeVerifier:
                                 return json.loads(line)
                             except json.JSONDecodeError as e:
                                 self.log(f"JSON decode error: {e}")
-                                self.log(f"Raw line: {repr(line)}")
+                                self.log(f"Raw line: {line!r}")
                                 # This is critical - non-JSON on stdout
                                 return {"_error": "invalid_json", "_raw": line}
                 except Exception as e:
                     self.log(f"Read error: {e}")
                     time.sleep(0.1)
-            
+
             self.log("Timeout waiting for response")
             return None
-            
+
         except Exception as e:
             self.log(f"Send/receive error: {e}")
             return None
-    
+
     def _stop_server(self) -> None:
         """Stop the server subprocess."""
         if self.process:
@@ -277,19 +276,19 @@ class MCPRuntimeVerifier:
             except subprocess.TimeoutExpired:
                 self.process.kill()
                 self.process.wait()
-            
+
             # Capture any remaining stderr for debugging
             if self.process.stderr:
                 stderr = self.process.stderr.read()
                 if stderr and self.verbose:
                     self.log(f"Server stderr:\n{stderr[:2000]}")
-    
+
     def test_initialize(self) -> bool:
         """Test MCP initialize handshake."""
         self.log("Testing initialize handshake...")
-        
+
         response = self._send_request(INITIALIZE_REQUEST)
-        
+
         if response is None:
             self.results.append(TestResult(
                 name="Initialize Handshake",
@@ -297,7 +296,7 @@ class MCPRuntimeVerifier:
                 message="No response to initialize request (timeout or crash)",
             ))
             return False
-        
+
         if "_error" in response:
             self.results.append(TestResult(
                 name="Initialize Handshake",
@@ -306,7 +305,7 @@ class MCPRuntimeVerifier:
                 details={"raw": response.get("_raw", "")[:200]},
             ))
             return False
-        
+
         # Check for valid JSON-RPC response
         if "result" in response:
             result = response["result"]
@@ -320,11 +319,11 @@ class MCPRuntimeVerifier:
                     "capabilities": list(result.get("capabilities", {}).keys()),
                 },
             ))
-            
+
             # Send initialized notification
             self._send_request(INITIALIZED_NOTIFICATION)
             return True
-        
+
         if "error" in response:
             self.results.append(TestResult(
                 name="Initialize Handshake",
@@ -333,7 +332,7 @@ class MCPRuntimeVerifier:
                 details=response["error"],
             ))
             return False
-        
+
         self.results.append(TestResult(
             name="Initialize Handshake",
             passed=False,
@@ -341,13 +340,13 @@ class MCPRuntimeVerifier:
             details=response,
         ))
         return False
-    
+
     def test_tools_list(self) -> bool:
         """Test tools/list request."""
         self.log("Testing tools/list...")
-        
+
         response = self._send_request(TOOLS_LIST_REQUEST)
-        
+
         if response is None:
             self.results.append(TestResult(
                 name="Tools List",
@@ -355,7 +354,7 @@ class MCPRuntimeVerifier:
                 message="No response to tools/list request",
             ))
             return False
-        
+
         if "_error" in response:
             self.results.append(TestResult(
                 name="Tools List",
@@ -364,12 +363,12 @@ class MCPRuntimeVerifier:
                 details={"raw": response.get("_raw", "")[:200]},
             ))
             return False
-        
+
         if "result" in response:
             result = response["result"]
             tools = result.get("tools", [])
             tool_names = [t.get("name") for t in tools if isinstance(t, dict)]
-            
+
             self.results.append(TestResult(
                 name="Tools List",
                 passed=True,
@@ -377,7 +376,7 @@ class MCPRuntimeVerifier:
                 details={"tools": tool_names},
             ))
             return True
-        
+
         if "error" in response:
             self.results.append(TestResult(
                 name="Tools List",
@@ -385,7 +384,7 @@ class MCPRuntimeVerifier:
                 message=f"Server error: {response['error']}",
             ))
             return False
-        
+
         self.results.append(TestResult(
             name="Tools List",
             passed=False,
@@ -393,38 +392,38 @@ class MCPRuntimeVerifier:
             details=response,
         ))
         return False
-    
+
     def run_all_tests(self) -> bool:
         """Run all verification tests."""
         print("=" * 60)
         print("RePORTaLiN MCP Server - Runtime Verification")
         print("=" * 60)
         print()
-        
+
         try:
             # Start server
             if not self._start_server():
                 return False
-            
+
             self.results.append(TestResult(
                 name="Server Startup",
                 passed=True,
                 message="Server process started",
             ))
-            
+
             # Run tests
             init_ok = self.test_initialize()
             if init_ok:
                 self.test_tools_list()
-            
+
         finally:
             self._stop_server()
-        
+
         # Print results
         print()
         print("Results:")
         print("-" * 40)
-        
+
         all_passed = True
         for result in self.results:
             print(result)
@@ -432,7 +431,7 @@ class MCPRuntimeVerifier:
                 print(f"   Details: {json.dumps(result.details, indent=2)[:500]}")
             if not result.passed:
                 all_passed = False
-        
+
         print()
         print("=" * 60)
         if all_passed:
@@ -440,7 +439,7 @@ class MCPRuntimeVerifier:
         else:
             print("❌ TESTS FAILED - See details above")
         print("=" * 60)
-        
+
         return all_passed
 
 
@@ -470,17 +469,17 @@ def main() -> int:
         default=".env.test",
         help="Environment file to load (default: .env.test)",
     )
-    
+
     args = parser.parse_args()
-    
+
     verifier = MCPRuntimeVerifier(
         timeout=args.timeout,
         verbose=args.verbose,
         env_file=args.env_file,
     )
-    
+
     success = verifier.run_all_tests()
-    
+
     return 0 if success else 1
 
 

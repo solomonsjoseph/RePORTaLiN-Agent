@@ -11,14 +11,13 @@ Set MCP_INTEGRATION_TEST=1 to enable live server tests.
 """
 
 import os
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from client import (
-    UniversalMCPClient,
-    MCPConnectionError,
     MCPAuthenticationError,
-    MCPToolExecutionError,
+    MCPConnectionError,
+    UniversalMCPClient,
 )
 
 pytestmark = [
@@ -45,7 +44,7 @@ class TestClientConnection:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         assert client.is_connected is False
         assert client.server_info == {}
 
@@ -55,7 +54,7 @@ class TestClientConnection:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         with pytest.raises(MCPConnectionError, match="Not connected"):
             await client.list_tools()
 
@@ -66,7 +65,7 @@ class TestClientConnection:
             auth_token="test-token",
             timeout=2.0,  # Short timeout for test
         )
-        
+
         with pytest.raises(MCPConnectionError):
             await client.connect()
 
@@ -112,7 +111,7 @@ class TestLiveServerConnection:
             auth_token=auth_token,
         ) as client:
             tools = await client.list_tools()
-            
+
             assert len(tools) >= 4
             tool_names = [t.name for t in tools]
             assert "health_check" in tool_names
@@ -126,7 +125,7 @@ class TestLiveServerConnection:
             auth_token=auth_token,
         ) as client:
             tools = await client.get_tools_for_openai()
-            
+
             assert len(tools) >= 4
             assert all(t["type"] == "function" for t in tools)
             assert all("function" in t for t in tools)
@@ -140,7 +139,7 @@ class TestLiveServerConnection:
             auth_token=auth_token,
         ) as client:
             tools = await client.get_tools_for_anthropic()
-            
+
             assert len(tools) >= 4
             assert all("name" in t for t in tools)
             assert all("input_schema" in t for t in tools)
@@ -154,7 +153,7 @@ class TestLiveServerConnection:
             auth_token=auth_token,
         ) as client:
             result = await client.execute_tool("health_check", {})
-            
+
             assert "healthy" in result.lower() or "status" in result.lower()
 
     async def test_list_resources_from_live_server(
@@ -166,7 +165,7 @@ class TestLiveServerConnection:
             auth_token=auth_token,
         ) as client:
             resources = await client.list_resources()
-            
+
             assert len(resources) >= 1
             uris = [str(r.uri) for r in resources]
             assert "config://server" in uris
@@ -177,7 +176,7 @@ class TestLiveServerConnection:
             server_url=server_url,
             auth_token="invalid-token-12345",
         )
-        
+
         with pytest.raises((MCPAuthenticationError, MCPConnectionError)):
             await client.connect()
 
@@ -192,12 +191,12 @@ class TestSchemaFormats:
     async def test_openai_format_structure(self) -> None:
         """Test OpenAI format has correct structure."""
         from mcp import types
-        
+
         client = UniversalMCPClient(
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         tool = types.Tool(
             name="test_tool",
             description="A test tool for unit testing",
@@ -210,9 +209,9 @@ class TestSchemaFormats:
                 "required": ["query"],
             },
         )
-        
+
         result = client._tool_to_openai(tool)
-        
+
         # Verify OpenAI structure
         assert result["type"] == "function"
         assert result["function"]["name"] == "test_tool"
@@ -224,12 +223,12 @@ class TestSchemaFormats:
     async def test_anthropic_format_structure(self) -> None:
         """Test Anthropic format has correct structure."""
         from mcp import types
-        
+
         client = UniversalMCPClient(
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         tool = types.Tool(
             name="test_tool",
             description="A test tool for unit testing",
@@ -241,9 +240,9 @@ class TestSchemaFormats:
                 "required": ["query"],
             },
         )
-        
+
         result = client._tool_to_anthropic(tool)
-        
+
         # Verify Anthropic structure
         assert result["name"] == "test_tool"
         assert result["description"] == "A test tool for unit testing"

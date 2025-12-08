@@ -25,10 +25,10 @@ Security Considerations:
 
 Usage:
     >>> from server.security.rate_limiter import RateLimiter, RateLimitConfig
-    >>> 
+    >>>
     >>> config = RateLimitConfig(requests_per_minute=60)
     >>> limiter = RateLimiter(config)
-    >>> 
+    >>>
     >>> # In request handler
     >>> if not await limiter.is_allowed(client_id):
     >>>     raise HTTPException(429, "Rate limit exceeded")
@@ -48,11 +48,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 __all__ = [
-    "RateLimiter",
+    "InMemoryRateLimiter",
     "RateLimitConfig",
     "RateLimitExceeded",
     "RateLimitResult",
-    "InMemoryRateLimiter",
+    "RateLimiter",
     "SlidingWindowLimiter",
 ]
 
@@ -64,13 +64,13 @@ __all__ = [
 class RateLimitExceeded(Exception):
     """
     Raised when a client exceeds their rate limit.
-    
+
     Attributes:
         client_id: Identifier of the rate-limited client
         limit: The rate limit that was exceeded
         retry_after: Seconds until the client can retry
     """
-    
+
     def __init__(
         self,
         client_id: str,
@@ -94,14 +94,14 @@ class RateLimitExceeded(Exception):
 class RateLimitConfig:
     """
     Configuration for rate limiting.
-    
+
     Attributes:
         requests_per_minute: Maximum requests allowed per minute
         requests_per_second: Maximum requests per second (burst limit)
         burst_size: Number of requests allowed in a burst
         enabled: Whether rate limiting is active
         whitelist: Client IDs exempt from rate limiting
-        
+
     Example:
         >>> config = RateLimitConfig(
         ...     requests_per_minute=60,
@@ -109,19 +109,19 @@ class RateLimitConfig:
         ...     burst_size=10,
         ... )
     """
-    
+
     requests_per_minute: int = 60
     requests_per_second: int = 10
     burst_size: int = 20
     enabled: bool = True
     whitelist: frozenset[str] = field(default_factory=frozenset)
-    
+
     @property
     def window_seconds(self) -> int:
         """Get the rate limit window in seconds."""
         return 60
-    
-    def with_whitelist(self, *client_ids: str) -> "RateLimitConfig":
+
+    def with_whitelist(self, *client_ids: str) -> RateLimitConfig:
         """Return a new config with additional whitelisted clients."""
         return RateLimitConfig(
             requests_per_minute=self.requests_per_minute,
@@ -136,7 +136,7 @@ class RateLimitConfig:
 class RateLimitResult:
     """
     Result of a rate limit check.
-    
+
     Attributes:
         allowed: Whether the request is allowed
         remaining: Number of requests remaining in the window
@@ -144,17 +144,17 @@ class RateLimitResult:
         reset_at: Unix timestamp when the window resets
         retry_after: Seconds to wait before retrying (if not allowed)
     """
-    
+
     allowed: bool
     remaining: int
     limit: int
     reset_at: float
     retry_after: float = 0.0
-    
+
     def to_headers(self) -> dict[str, str]:
         """
         Generate HTTP headers for rate limit info.
-        
+
         Returns standard rate limit headers:
         - X-RateLimit-Limit: Total requests allowed
         - X-RateLimit-Remaining: Requests remaining
@@ -178,52 +178,52 @@ class RateLimitResult:
 class RateLimiter(ABC):
     """
     Abstract base class for rate limiters.
-    
+
     Implementations must provide async methods for checking and
     recording rate limits. This allows for different storage backends
     (in-memory, Redis, database).
     """
-    
+
     def __init__(self, config: RateLimitConfig) -> None:
         """Initialize with configuration."""
         self.config = config
-    
+
     @abstractmethod
     async def check(self, client_id: str) -> RateLimitResult:
         """
         Check if a request is allowed and record it.
-        
+
         Args:
             client_id: Unique identifier for the client
-            
+
         Returns:
             RateLimitResult with allow/deny decision and metadata
         """
         pass
-    
+
     async def is_allowed(self, client_id: str) -> bool:
         """
         Simple check if a request is allowed.
-        
+
         Args:
             client_id: Unique identifier for the client
-            
+
         Returns:
             True if allowed, False if rate limited
         """
         result = await self.check(client_id)
         return result.allowed
-    
+
     async def require(self, client_id: str) -> RateLimitResult:
         """
         Check rate limit and raise exception if exceeded.
-        
+
         Args:
             client_id: Unique identifier for the client
-            
+
         Returns:
             RateLimitResult if allowed
-            
+
         Raises:
             RateLimitExceeded: If rate limit is exceeded
         """
@@ -235,12 +235,12 @@ class RateLimiter(ABC):
                 retry_after=result.retry_after,
             )
         return result
-    
+
     @abstractmethod
     async def reset(self, client_id: str) -> None:
         """Reset the rate limit counter for a client."""
         pass
-    
+
     @abstractmethod
     async def get_stats(self) -> dict[str, Any]:
         """Get rate limiter statistics."""
@@ -254,7 +254,7 @@ class RateLimiter(ABC):
 @dataclass
 class _WindowState:
     """Internal state for sliding window rate limiter."""
-    
+
     count: int = 0
     window_start: float = 0.0
     last_request: float = 0.0
@@ -263,25 +263,25 @@ class _WindowState:
 class InMemoryRateLimiter(RateLimiter):
     """
     In-memory sliding window rate limiter.
-    
+
     This implementation uses a simple sliding window algorithm that
     tracks request counts per client within a time window.
-    
+
     Thread Safety:
         Uses asyncio.Lock for thread-safe access to state.
         Safe for use with multiple concurrent requests.
-    
+
     Memory:
         State is periodically cleaned to prevent memory growth.
         Inactive clients are evicted after 2x window duration.
-    
+
     Limitations:
         - Not suitable for distributed deployments (use Redis instead)
         - State is lost on server restart
-        
+
     Attributes:
         config: Rate limit configuration
-        
+
     Example:
         >>> config = RateLimitConfig(requests_per_minute=60)
         >>> limiter = InMemoryRateLimiter(config)
@@ -289,7 +289,7 @@ class InMemoryRateLimiter(RateLimiter):
         >>> if result.allowed:
         ...     # Process request
     """
-    
+
     def __init__(self, config: RateLimitConfig) -> None:
         super().__init__(config)
         self._state: dict[str, _WindowState] = defaultdict(_WindowState)
@@ -298,11 +298,11 @@ class InMemoryRateLimiter(RateLimiter):
         self._cleanup_interval = 300.0  # 5 minutes
         self._total_requests = 0
         self._total_blocked = 0
-    
+
     async def check(self, client_id: str) -> RateLimitResult:
         """
         Check if request is allowed using sliding window algorithm.
-        
+
         The sliding window smoothly transitions counts between windows,
         avoiding the "thundering herd" problem at window boundaries.
         """
@@ -314,7 +314,7 @@ class InMemoryRateLimiter(RateLimiter):
                 limit=self.config.requests_per_minute,
                 reset_at=time.time() + 60,
             )
-        
+
         if client_id in self.config.whitelist:
             return RateLimitResult(
                 allowed=True,
@@ -322,14 +322,14 @@ class InMemoryRateLimiter(RateLimiter):
                 limit=self.config.requests_per_minute,
                 reset_at=time.time() + 60,
             )
-        
+
         async with self._lock:
             now = time.time()
             window_size = self.config.window_seconds
-            
+
             # Get or create state
             state = self._state[client_id]
-            
+
             # Check if we need to start a new window
             window_end = state.window_start + window_size
             if now >= window_end:
@@ -338,22 +338,22 @@ class InMemoryRateLimiter(RateLimiter):
                 carryover = int(state.count * (1 - elapsed_ratio))
                 state.count = carryover
                 state.window_start = now
-            
+
             # Calculate remaining
             remaining = self.config.requests_per_minute - state.count
             reset_at = state.window_start + window_size
-            
+
             # Check if allowed
             self._total_requests += 1
-            
+
             if remaining > 0:
                 state.count += 1
                 state.last_request = now
-                
+
                 # Periodic cleanup
                 if now - self._last_cleanup > self._cleanup_interval:
                     await self._cleanup_stale_entries(now)
-                
+
                 return RateLimitResult(
                     allowed=True,
                     remaining=remaining - 1,
@@ -370,7 +370,7 @@ class InMemoryRateLimiter(RateLimiter):
                     reset_at=reset_at,
                     retry_after=max(0, retry_after),
                 )
-    
+
     async def _cleanup_stale_entries(self, now: float) -> None:
         """Remove entries for inactive clients."""
         stale_threshold = now - (self.config.window_seconds * 2)
@@ -381,13 +381,13 @@ class InMemoryRateLimiter(RateLimiter):
         for key in stale_keys:
             del self._state[key]
         self._last_cleanup = now
-    
+
     async def reset(self, client_id: str) -> None:
         """Reset rate limit for a specific client."""
         async with self._lock:
             if client_id in self._state:
                 del self._state[client_id]
-    
+
     async def get_stats(self) -> dict[str, Any]:
         """Get rate limiter statistics."""
         async with self._lock:

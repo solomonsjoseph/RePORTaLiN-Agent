@@ -871,6 +871,19 @@ wheels = [
 ]
 
 [[package]]
+name = "hypothesis"
+version = "6.148.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
+    { name = "sortedcontainers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/09/5e/6a506e81d4dfefed2e838b6beaaae87b2e411dda3da0a3abf94099f194ae/hypothesis-6.148.7.tar.gz", hash = "sha256:b96e817e715c5b1a278411e3b9baf6d599d5b12207ba25e41a8f066929f6c2a6", size = 471199, upload-time = "2025-12-05T02:12:38.068Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e9/55/fa5607e4a4af96dfa0e7efd81bbd130735cedd21aac70b25e06191bff92f/hypothesis-6.148.7-py3-none-any.whl", hash = "sha256:94dbd58ebf259afa3bafb1d3bf5761ac1bde6f1477de494798cbf7960aabbdee", size = 538127, upload-time = "2025-12-05T02:12:35.54Z" },
+]
+
+[[package]]
 name = "identify"
 version = "2.6.15"
 source = { registry = "https://pypi.org/simple" }
@@ -2565,6 +2578,7 @@ all = [
     { name = "black" },
     { name = "commitizen" },
     { name = "httpx" },
+    { name = "hypothesis" },
     { name = "mkdocs" },
     { name = "mkdocs-material" },
     { name = "mkdocstrings", extra = ["python"] },
@@ -2585,6 +2599,7 @@ dev = [
     { name = "black" },
     { name = "commitizen" },
     { name = "httpx" },
+    { name = "hypothesis" },
     { name = "mypy" },
     { name = "pip-audit" },
     { name = "pre-commit" },
@@ -2625,6 +2640,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=41.0.0,<45.0.0" },
     { name = "fastapi", specifier = ">=0.115.0,<1.0.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
+    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.100.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.0.0,<2.0.0" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.5.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },

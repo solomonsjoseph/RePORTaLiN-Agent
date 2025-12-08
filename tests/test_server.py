@@ -19,13 +19,13 @@ Running Tests:
     ```bash
     # Run all tests
     uv run pytest tests/test_server.py -v
-    
+
     # Run only security tests
     uv run pytest tests/test_server.py -m security -v
-    
+
     # Run only auth tests
     uv run pytest tests/test_server.py -m auth -v
-    
+
     # Run with coverage
     uv run pytest tests/test_server.py --cov=server -v
     ```
@@ -41,14 +41,11 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from server.tools import (
-    QueryDatabaseInput,
-    SearchDictionaryInput,
-    FetchMetricsInput,
-    MetricType,
-)
 from server.auth import verify_token
-
+from server.tools import (
+    BuildTechnicalRequestInput,
+    ExploreStudyMetadataInput,
+)
 
 # =============================================================================
 # Test Markers
@@ -64,19 +61,19 @@ pytestmark = [pytest.mark.security]
 class TestAuthenticationSecurity:
     """
     Tests for authentication enforcement on protected endpoints.
-    
+
     These tests verify that:
     - Protected endpoints reject unauthenticated requests
     - Invalid tokens are rejected with 401/403
     - Valid tokens allow access
     - Public endpoints remain accessible
     """
-    
+
     @pytest.mark.auth
     def test_health_endpoint_is_public(self, test_client):
         """
         Health endpoint should be accessible without authentication.
-        
+
         The /health endpoint is used for Kubernetes liveness probes
         and must be accessible without auth headers.
         """
@@ -84,42 +81,42 @@ class TestAuthenticationSecurity:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
-    
+
     @pytest.mark.auth
     def test_ready_endpoint_is_public(self, test_client):
         """
         Readiness endpoint should be accessible without authentication.
-        
+
         The /ready endpoint is used for Kubernetes readiness probes.
         """
         response = test_client.get("/ready")
         assert response.status_code == 200
         data = response.json()
         assert data["ready"] is True
-    
+
     @pytest.mark.auth
     def test_tools_endpoint_requires_auth(self, test_client, no_auth_headers):
         """
         Tools endpoint should require authentication.
-        
+
         The /tools endpoint exposes server capabilities and must
         be protected to prevent information disclosure.
         """
         response = test_client.get("/tools", headers=no_auth_headers)
         assert response.status_code == 401
-    
+
     @pytest.mark.auth
     def test_tools_endpoint_rejects_invalid_token(
         self, test_client, invalid_auth_headers
     ):
         """
         Tools endpoint should reject invalid authentication tokens.
-        
+
         Invalid tokens should result in 401 Unauthorized, not 403 Forbidden.
         """
         response = test_client.get("/tools", headers=invalid_auth_headers)
         assert response.status_code == 401
-    
+
     @pytest.mark.auth
     def test_tools_endpoint_accepts_valid_token(self, test_client, auth_headers):
         """
@@ -129,7 +126,7 @@ class TestAuthenticationSecurity:
         assert response.status_code == 200
         data = response.json()
         assert "tools" in data
-    
+
     @pytest.mark.auth
     def test_info_endpoint_requires_auth(self, test_client, no_auth_headers):
         """
@@ -137,7 +134,7 @@ class TestAuthenticationSecurity:
         """
         response = test_client.get("/info", headers=no_auth_headers)
         assert response.status_code == 401
-    
+
     @pytest.mark.auth
     def test_info_endpoint_accepts_valid_token(self, test_client, auth_headers):
         """
@@ -147,12 +144,12 @@ class TestAuthenticationSecurity:
         assert response.status_code == 200
         data = response.json()
         assert "server_name" in data
-    
+
     @pytest.mark.auth
     def test_mcp_sse_requires_auth(self, test_client, no_auth_headers):
         """
         MCP SSE endpoint should require authentication.
-        
+
         The /mcp/sse endpoint is the main MCP connection point and
         must be protected to prevent unauthorized tool execution.
         """
@@ -161,7 +158,7 @@ class TestAuthenticationSecurity:
         response = test_client.get("/mcp/sse", headers=no_auth_headers)
         # Should return 401 from the MCPAuthMiddleware
         assert response.status_code == 401
-    
+
     @pytest.mark.auth
     def test_mcp_sse_rejects_invalid_token(self, test_client, invalid_auth_headers):
         """
@@ -172,262 +169,279 @@ class TestAuthenticationSecurity:
 
 
 # =============================================================================
-# Query Validation Security Tests
+# PHI Request Validation Security Tests (SECURE MODE)
 # =============================================================================
 
-class TestQueryValidation:
+class TestPHIRequestValidation:
     """
-    Tests for SQL injection prevention in QueryDatabaseInput.
-    
-    These tests verify that dangerous SQL patterns are rejected
-    at the Pydantic validation layer, before reaching any database.
+    Tests for PHI (Protected Health Information) request prevention
+    in ExploreStudyMetadataInput.
+
+    These tests verify that requests for raw patient data are rejected
+    at the Pydantic validation layer.
     """
-    
+
     @pytest.mark.security
-    def test_delete_query_rejected(self):
+    def test_show_patients_request_rejected(self):
         """
-        DELETE queries should be rejected by the validator.
-        
-        This is a critical security test - DELETE queries could
-        cause data loss if allowed through.
+        Requests to show patient records should be rejected.
+
+        This is a critical security test - raw PHI requests could
+        expose protected health information.
         """
         with pytest.raises(ValidationError) as exc_info:
-            QueryDatabaseInput(query="DELETE FROM patients WHERE id = 1")
-        
+            ExploreStudyMetadataInput(query="show me all patients")
+
         errors = exc_info.value.errors()
         assert len(errors) > 0
-        # Check that the error is about forbidden keywords
-        error_msg = str(errors[0]["msg"]).lower()
-        assert "select" in error_msg or "delete" in error_msg or "forbidden" in error_msg
-    
+
     @pytest.mark.security
-    def test_insert_query_rejected(self):
+    def test_list_records_request_rejected(self):
         """
-        INSERT queries should be rejected by the validator.
+        Requests to list records should be rejected.
         """
         with pytest.raises(ValidationError) as exc_info:
-            QueryDatabaseInput(query="INSERT INTO patients (id, name) VALUES (1, 'test')")
-        
+            ExploreStudyMetadataInput(query="list the patient records")
+
         errors = exc_info.value.errors()
         assert len(errors) > 0
-    
+
     @pytest.mark.security
-    def test_update_query_rejected(self):
+    def test_export_data_request_rejected(self):
         """
-        UPDATE queries should be rejected by the validator.
+        Requests to export data should be rejected.
         """
         with pytest.raises(ValidationError) as exc_info:
-            QueryDatabaseInput(query="UPDATE patients SET name = 'test' WHERE id = 1")
-        
+            ExploreStudyMetadataInput(query="export data to CSV")
+
         errors = exc_info.value.errors()
         assert len(errors) > 0
-    
+
     @pytest.mark.security
-    def test_drop_table_rejected(self):
+    def test_download_dataset_request_rejected(self):
         """
-        DROP TABLE queries should be rejected by the validator.
-        
-        This prevents database destruction attacks.
+        Requests to download datasets should be rejected.
         """
         with pytest.raises(ValidationError) as exc_info:
-            QueryDatabaseInput(query="DROP TABLE patients")
-        
+            ExploreStudyMetadataInput(query="download dataset")
+
         errors = exc_info.value.errors()
         assert len(errors) > 0
-    
+
     @pytest.mark.security
-    def test_truncate_table_rejected(self):
+    def test_raw_data_request_rejected(self):
         """
-        TRUNCATE TABLE queries should be rejected by the validator.
+        Requests for raw data should be rejected.
         """
         with pytest.raises(ValidationError) as exc_info:
-            QueryDatabaseInput(query="TRUNCATE TABLE patients")
-        
+            ExploreStudyMetadataInput(query="show raw data")
+
         errors = exc_info.value.errors()
         assert len(errors) > 0
-    
+
     @pytest.mark.security
-    def test_sql_comment_injection_rejected(self):
+    def test_patient_names_request_rejected(self):
         """
-        SQL comment injection attempts should be rejected.
-        
-        Comments like -- or /* can be used to bypass query restrictions.
+        Requests for patient names should be rejected.
         """
-        # Test double-dash comment injection
-        with pytest.raises(ValidationError):
-            QueryDatabaseInput(query="SELECT * FROM patients -- DELETE FROM patients")
-        
-        # Test multi-line comment injection
-        with pytest.raises(ValidationError):
-            QueryDatabaseInput(query="SELECT * FROM patients /* DELETE */ WHERE 1=1")
-    
+        with pytest.raises(ValidationError) as exc_info:
+            ExploreStudyMetadataInput(query="get patient names")
+
+        errors = exc_info.value.errors()
+        assert len(errors) > 0
+
     @pytest.mark.security
-    def test_exec_statement_rejected(self):
+    def test_individual_records_request_rejected(self):
         """
-        EXEC/EXECUTE statements should be rejected.
-        
-        These can be used to execute arbitrary stored procedures.
+        Requests for individual records should be rejected.
         """
-        with pytest.raises(ValidationError):
-            QueryDatabaseInput(query="EXEC sp_executesql @sql")
-        
-        with pytest.raises(ValidationError):
-            QueryDatabaseInput(query="EXECUTE sp_executesql @sql")
-    
+        with pytest.raises(ValidationError) as exc_info:
+            ExploreStudyMetadataInput(query="show individual records for ID 123")
+
+        errors = exc_info.value.errors()
+        assert len(errors) > 0
+
     @pytest.mark.security
-    def test_alter_table_rejected(self):
+    def test_valid_metadata_query_accepted(self):
         """
-        ALTER TABLE statements should be rejected.
-        
-        These could be used to modify schema.
-        """
-        with pytest.raises(ValidationError):
-            QueryDatabaseInput(query="ALTER TABLE patients ADD COLUMN hack TEXT")
-    
-    @pytest.mark.security
-    def test_create_table_rejected(self):
-        """
-        CREATE TABLE statements should be rejected.
-        """
-        with pytest.raises(ValidationError):
-            QueryDatabaseInput(query="CREATE TABLE malicious (id INT)")
-    
-    @pytest.mark.security
-    def test_valid_select_accepted(self):
-        """
-        Valid SELECT queries should be accepted.
-        
+        Valid metadata queries should be accepted.
+
         This is a positive test to ensure legitimate queries work.
         """
-        # Simple select
-        input1 = QueryDatabaseInput(query="SELECT * FROM patients")
-        assert input1.query.startswith("SELECT")
-        
-        # Select with WHERE
-        input2 = QueryDatabaseInput(query="SELECT id, name FROM patients WHERE age > 18")
-        assert "WHERE" in input2.query.upper()
-        
-        # Select with JOIN
-        input3 = QueryDatabaseInput(
-            query="SELECT p.*, d.diagnosis FROM patients p JOIN diagnoses d ON p.id = d.patient_id"
-        )
-        assert "JOIN" in input3.query.upper()
-    
-    @pytest.mark.security
-    def test_query_must_start_with_select(self):
-        """
-        Queries that don't start with SELECT should be rejected.
-        """
-        with pytest.raises(ValidationError) as exc_info:
-            QueryDatabaseInput(query="SHOW TABLES")
-        
-        errors = exc_info.value.errors()
-        assert len(errors) > 0
-    
-    @pytest.mark.security
-    def test_all_dangerous_queries_rejected(self, dangerous_queries):
-        """
-        All dangerous queries from the fixture should be rejected.
-        
-        Uses the dangerous_queries fixture from conftest.py.
-        """
-        for dangerous_query in dangerous_queries:
-            with pytest.raises(ValidationError):
-                QueryDatabaseInput(query=dangerous_query)
-    
-    @pytest.mark.security
-    def test_all_safe_queries_accepted(self, safe_queries):
-        """
-        All safe queries from the fixture should be accepted.
-        
-        Uses the safe_queries fixture from conftest.py.
-        """
-        for safe_query in safe_queries:
-            input_model = QueryDatabaseInput(query=safe_query)
-            assert input_model.query is not None
+        # Variable check query
+        input1 = ExploreStudyMetadataInput(query="Do we have CD4 counts in the study?")
+        assert "CD4" in input1.query
 
+        # Site query
+        input2 = ExploreStudyMetadataInput(query="How many study sites are there?")
+        assert "sites" in input2.query.lower()
 
-# =============================================================================
-# Search Dictionary Security Tests
-# =============================================================================
+        # Time point query
+        input3 = ExploreStudyMetadataInput(
+            query="What time points are available for follow-up?",
+            time_point_filter="Month 24"
+        )
+        assert input3.time_point_filter == "Month 24"
 
-class TestSearchDictionarySecurity:
-    """
-    Tests for injection prevention in SearchDictionaryInput.
-    
-    These tests verify that dangerous characters are sanitized
-    from search terms before processing.
-    """
-    
     @pytest.mark.security
-    def test_sql_injection_characters_sanitized(self):
+    def test_query_minimum_length_enforced(self):
         """
-        SQL injection characters should be removed from search terms.
-        """
-        input_model = SearchDictionaryInput(
-            search_term="patient; DROP TABLE--"
-        )
-        
-        # Semicolons and double-dashes should be removed
-        assert ";" not in input_model.search_term
-        assert "--" not in input_model.search_term
-    
-    @pytest.mark.security
-    def test_quote_injection_sanitized(self):
-        """
-        Quote characters should be removed from search terms.
-        """
-        input_model = SearchDictionaryInput(
-            search_term="patient' OR '1'='1"
-        )
-        
-        assert "'" not in input_model.search_term
-    
-    @pytest.mark.security
-    def test_backtick_injection_sanitized(self):
-        """
-        Backtick characters should be removed from search terms.
-        """
-        input_model = SearchDictionaryInput(
-            search_term="patient`; DROP TABLE--"
-        )
-        
-        assert "`" not in input_model.search_term
-    
-    @pytest.mark.security
-    def test_parentheses_sanitized(self):
-        """
-        Parentheses should be removed from search terms.
-        
-        These could be used for function injection.
-        """
-        input_model = SearchDictionaryInput(
-            search_term="EXEC(DROP TABLE)"
-        )
-        
-        assert "(" not in input_model.search_term
-        assert ")" not in input_model.search_term
-    
-    @pytest.mark.security
-    def test_valid_search_term_accepted(self):
-        """
-        Valid search terms should work normally.
-        """
-        input_model = SearchDictionaryInput(
-            search_term="patient_id"
-        )
-        
-        assert input_model.search_term == "patient_id"
-    
-    @pytest.mark.security
-    def test_minimum_length_enforced(self):
-        """
-        Search terms must meet minimum length requirement.
-        
-        This prevents empty or single-character searches.
+        Queries must meet minimum length requirement.
         """
         with pytest.raises(ValidationError):
-            SearchDictionaryInput(search_term="a")
+            ExploreStudyMetadataInput(query="data")  # Too short
+
+
+# =============================================================================
+# Forbidden Zone Security Tests (SECURE MODE)
+# =============================================================================
+
+class TestForbiddenZoneSecurity:
+    """
+    Tests for forbidden zone path access prevention.
+
+    These tests verify that attempts to access ./data/dataset/
+    are rejected with the security alert message.
+    """
+
+    @pytest.mark.security
+    def test_data_dataset_path_rejected(self):
+        """
+        Requests mentioning data/dataset path should be rejected.
+        """
+        with pytest.raises(ValidationError) as exc_info:
+            ExploreStudyMetadataInput(query="read from data/dataset folder")
+
+        error_msg = str(exc_info.value)
+        assert "SECURITY ALERT" in error_msg
+
+    @pytest.mark.security
+    def test_indo_vap_files_rejected(self):
+        """
+        Requests mentioning Indo-VAP files should be rejected.
+        """
+        with pytest.raises(ValidationError) as exc_info:
+            ExploreStudyMetadataInput(query="show indo-vap csv files")
+
+        error_msg = str(exc_info.value)
+        assert "SECURITY ALERT" in error_msg
+
+    @pytest.mark.security
+    def test_specific_phi_file_rejected(self):
+        """
+        Requests for specific PHI files (6_HIV.xlsx) should be rejected.
+        """
+        with pytest.raises(ValidationError) as exc_info:
+            ExploreStudyMetadataInput(query="open the 6_HIV file")
+
+        error_msg = str(exc_info.value)
+        assert "SECURITY ALERT" in error_msg
+
+    @pytest.mark.security
+    def test_baseline_file_rejected(self):
+        """
+        Requests for baseline files (2A_ICBaseline.xlsx) should be rejected.
+        """
+        with pytest.raises(ValidationError) as exc_info:
+            ExploreStudyMetadataInput(query="read 2A_ICBaseline data")
+
+        error_msg = str(exc_info.value)
+        assert "SECURITY ALERT" in error_msg
+
+    @pytest.mark.security
+    def test_xlsx_file_access_rejected(self):
+        """
+        Requests to access .xlsx files should be rejected.
+        """
+        with pytest.raises(ValidationError) as exc_info:
+            ExploreStudyMetadataInput(query="open the .xlsx file")
+
+        error_msg = str(exc_info.value)
+        assert "SECURITY ALERT" in error_msg
+
+    @pytest.mark.security
+    def test_raw_dataset_access_rejected(self):
+        """
+        Requests to access raw dataset should be rejected.
+        """
+        with pytest.raises(ValidationError) as exc_info:
+            ExploreStudyMetadataInput(query="access the raw dataset")
+
+        error_msg = str(exc_info.value)
+        assert "SECURITY ALERT" in error_msg
+
+
+# =============================================================================
+# Technical Request Validation Tests (SECURE MODE)
+# =============================================================================
+
+class TestTechnicalRequestValidation:
+    """
+    Tests for BuildTechnicalRequestInput validation.
+
+    These tests verify that concept sheet requests are properly validated.
+    """
+
+    @pytest.mark.security
+    def test_valid_request_accepted(self):
+        """
+        Valid technical requests should be accepted.
+        """
+        input_model = BuildTechnicalRequestInput(
+            description="Analyze treatment outcomes in TB patients",
+            inclusion_criteria=["Female", "Age 18-45"],
+            exclusion_criteria=["HIV co-infection"],
+            variables_of_interest=["Age", "Sex", "TB_Status"],
+            time_points=["Baseline", "Month 6"],
+            output_format="concept_sheet",
+        )
+
+        assert input_model.description is not None
+        assert len(input_model.inclusion_criteria) == 2
+
+    @pytest.mark.security
+    def test_description_minimum_length_enforced(self):
+        """
+        Description must meet minimum length requirement.
+        """
+        with pytest.raises(ValidationError):
+            BuildTechnicalRequestInput(
+                description="Too short",  # Less than 10 chars
+            )
+
+    @pytest.mark.security
+    def test_output_format_validated(self):
+        """
+        Output format must be a valid option.
+        """
+        # Valid formats
+        for fmt in ["concept_sheet", "query_logic"]:
+            input_model = BuildTechnicalRequestInput(
+                description="Analyze treatment outcomes in TB patients",
+                output_format=fmt,
+            )
+            assert input_model.output_format == fmt
+
+        # Invalid format should fail
+        with pytest.raises(ValidationError):
+            BuildTechnicalRequestInput(
+                description="Analyze treatment outcomes in TB patients",
+                output_format="invalid_format",
+            )
+
+    @pytest.mark.security
+    def test_empty_criteria_allowed(self):
+        """
+        Empty inclusion/exclusion criteria should be allowed.
+        """
+        input_model = BuildTechnicalRequestInput(
+            description="Analyze all participants in the study",
+            inclusion_criteria=[],
+            exclusion_criteria=[],
+        )
+
+        assert len(input_model.inclusion_criteria) == 0
+        assert len(input_model.exclusion_criteria) == 0
 
 
 # =============================================================================
@@ -437,65 +451,65 @@ class TestSearchDictionarySecurity:
 class TestTokenVerification:
     """
     Tests for the token verification utility function.
-    
+
     These tests verify constant-time comparison behavior
     and edge case handling.
     """
-    
+
     @pytest.mark.security
     def test_valid_token_passes(self):
         """
         Matching tokens should verify successfully.
         """
         assert verify_token("secret123", "secret123") is True
-    
+
     @pytest.mark.security
     def test_invalid_token_fails(self):
         """
         Non-matching tokens should fail verification.
         """
         assert verify_token("wrong", "secret123") is False
-    
+
     @pytest.mark.security
     def test_none_provided_fails(self):
         """
         None provided token should fail verification.
         """
         assert verify_token(None, "secret123") is False
-    
+
     @pytest.mark.security
     def test_none_expected_fails(self):
         """
         None expected token should fail verification.
         """
         assert verify_token("secret123", None) is False
-    
+
     @pytest.mark.security
     def test_both_none_fails(self):
         """
         Both tokens None should fail verification.
         """
         assert verify_token(None, None) is False
-    
+
     @pytest.mark.security
     def test_empty_provided_fails(self):
         """
         Empty string provided token should fail verification.
         """
         assert verify_token("", "secret123") is False
-    
+
     @pytest.mark.security
     def test_empty_expected_fails(self):
         """
         Empty string expected token should fail verification.
         """
         assert verify_token("secret123", "") is False
-    
+
     @pytest.mark.security
     def test_different_length_tokens_fail(self):
         """
         Different length tokens should fail verification.
-        
+
         This tests that length differences don't cause timing leaks.
         """
         assert verify_token("short", "much_longer_token") is False
@@ -503,142 +517,123 @@ class TestTokenVerification:
 
 
 # =============================================================================
-# Metrics Input Validation Tests
-# =============================================================================
-
-class TestMetricsInputValidation:
-    """
-    Tests for FetchMetricsInput validation.
-    """
-    
-    @pytest.mark.security
-    def test_valid_metric_types_accepted(self):
-        """
-        All valid metric types should be accepted.
-        """
-        for metric_type in MetricType:
-            input_model = FetchMetricsInput(
-                metric_type=metric_type,
-                field_name="test_field",
-            )
-            assert input_model.metric_type == metric_type
-    
-    @pytest.mark.security
-    def test_invalid_metric_type_rejected(self):
-        """
-        Invalid metric types should be rejected.
-        """
-        with pytest.raises(ValidationError):
-            FetchMetricsInput(
-                metric_type="invalid_type",  # type: ignore
-                field_name="test_field",
-            )
-    
-    @pytest.mark.security
-    def test_field_name_required(self):
-        """
-        Field name is required and cannot be empty.
-        """
-        with pytest.raises(ValidationError):
-            FetchMetricsInput(
-                metric_type=MetricType.COUNT,
-                field_name="",
-            )
-
-
-# =============================================================================
-# Tool Execution Security Tests
+# Tool Execution Security Tests (SECURE MODE - 2 Tools Only)
 # =============================================================================
 
 class TestToolExecutionSecurity:
     """
     Tests for direct tool function security.
-    
+
     These tests import and call tool functions directly to verify
     their security behavior without going through the HTTP layer.
+
+    SECURE MODE: Only two tools are available:
+    1. explore_study_metadata
+    2. build_technical_request
     """
-    
+
     @pytest.mark.asyncio
     @pytest.mark.security
-    async def test_query_database_rejects_delete_query_directly(self):
+    async def test_explore_study_metadata_rejects_phi_request(self):
         """
-        CRITICAL: Import query_database directly and verify DELETE queries are rejected.
-        
-        This test satisfies Phase 5 requirement:
-        "Import the query_database function directly from server.tools.
-         Pass it a DELETE query and assert it raises a ValueError."
-        
-        The security check happens at the Pydantic validation layer,
-        so creating a QueryDatabaseInput with a DELETE query raises ValidationError.
+        CRITICAL: Verify explore_study_metadata rejects requests for raw PHI data.
+
+        The security check happens at the Pydantic validation layer.
+        Queries requesting patient records should raise ValidationError.
         """
-        from server.tools import query_database, QueryDatabaseInput
-        
-        # Attempting to create input with DELETE query should raise ValueError
-        # (Pydantic's ValidationError inherits from ValueError)
-        with pytest.raises((ValueError, ValidationError)) as exc_info:
-            QueryDatabaseInput(query="DELETE FROM patients WHERE id = 1")
-        
-        # Verify the error message mentions the security restriction
-        error_str = str(exc_info.value).lower()
-        assert "select" in error_str or "delete" in error_str or "forbidden" in error_str
-    
+        from server.tools import ExploreStudyMetadataInput
+
+        # Attempting to request patient data should raise ValueError
+        phi_queries = [
+            "show me all patients",
+            "list the patient records",
+            "export data to CSV",
+            "download dataset",
+            "show raw data",
+        ]
+
+        for query in phi_queries:
+            with pytest.raises((ValueError, ValidationError)) as exc_info:
+                ExploreStudyMetadataInput(query=query)
+
+            # Verify the error message mentions metadata/formal request
+            error_str = str(exc_info.value).lower()
+            assert "metadata" in error_str or "formal" in error_str or "data request" in error_str
+
     @pytest.mark.asyncio
     @pytest.mark.security
-    async def test_query_database_validates_input(self, query_database_input):
+    async def test_explore_study_metadata_validates_input(self, explore_study_metadata_input):
         """
-        query_database tool should validate input before execution.
+        explore_study_metadata tool should validate input before execution.
         """
-        from server.tools import query_database
-        
+        from server.tools import ExploreStudyMetadataInput, explore_study_metadata
+
         # Create valid input
-        input_model = QueryDatabaseInput(**query_database_input)
-        
-        # Execute should work with valid input
-        result = await query_database(input_model)
+        input_model = ExploreStudyMetadataInput(**explore_study_metadata_input)
+
+        # Execute should work with valid input (mocked context)
+        from unittest.mock import AsyncMock, MagicMock
+        mock_ctx = MagicMock()
+        mock_ctx.info = AsyncMock()
+
+        result = await explore_study_metadata(input_model, mock_ctx)
         assert result["success"] is True
-    
+        assert "results" in result
+
     @pytest.mark.asyncio
     @pytest.mark.security
-    async def test_search_dictionary_validates_input(self, search_dictionary_input):
+    async def test_build_technical_request_validates_input(self, build_technical_request_input):
         """
-        search_dictionary tool should validate input before execution.
+        build_technical_request tool should validate input before execution.
         """
-        from server.tools import search_dictionary
-        
+        from server.tools import BuildTechnicalRequestInput, build_technical_request
+
         # Create valid input
-        input_model = SearchDictionaryInput(**search_dictionary_input)
-        
-        # Execute should work with valid input
-        result = await search_dictionary(input_model)
+        input_model = BuildTechnicalRequestInput(**build_technical_request_input)
+
+        # Execute should work with valid input (mocked context)
+        from unittest.mock import AsyncMock, MagicMock
+        mock_ctx = MagicMock()
+        mock_ctx.info = AsyncMock()
+
+        result = await build_technical_request(input_model, mock_ctx)
         assert result["success"] is True
-    
+        assert "request_id" in result
+        assert "output" in result
+
     @pytest.mark.asyncio
     @pytest.mark.security
-    async def test_fetch_metrics_validates_input(self, fetch_metrics_input):
+    async def test_old_tools_not_available(self):
         """
-        fetch_metrics tool should validate input before execution.
+        CRITICAL: Verify old tools are NOT importable (secure mode enforcement).
         """
-        from server.tools import fetch_metrics
-        
-        # Create valid input
-        fetch_metrics_input["metric_type"] = MetricType.COUNT
-        input_model = FetchMetricsInput(**fetch_metrics_input)
-        
-        # Execute should work with valid input
-        result = await fetch_metrics(input_model)
-        assert result["success"] is True
-    
+        from server.tools import mcp
+
+        tools = await mcp.list_tools()
+        tool_names = [t.name for t in tools]
+
+        # Old tools should NOT exist
+        assert "query_database" not in tool_names
+        assert "search_dictionary" not in tool_names
+        assert "fetch_metrics" not in tool_names
+        assert "health_check" not in tool_names
+        assert "list_datasets" not in tool_names
+        assert "describe_schema" not in tool_names
+        assert "get_pipeline_status" not in tool_names
+
     @pytest.mark.asyncio
     @pytest.mark.security
-    async def test_health_check_returns_status(self):
+    async def test_only_two_tools_registered(self):
         """
-        health_check tool should return server status.
+        Verify exactly two tools are registered (security constraint).
         """
-        from server.tools import health_check
-        
-        result = await health_check()
-        assert result["status"] == "healthy"
-        assert "server_name" in result
+        from server.tools import get_tool_registry
+
+        registry = get_tool_registry()
+        assert registry["mode"] == "SECURE"
+        assert len(registry["registered_tools"]) == 2
+        assert "explore_study_metadata" in registry["registered_tools"]
+        assert "build_technical_request" in registry["registered_tools"]
 
 
 # =============================================================================
@@ -648,37 +643,37 @@ class TestToolExecutionSecurity:
 class TestResponseFormats:
     """
     Tests for API response format consistency.
-    
+
     These tests verify that responses follow expected formats
     for both success and error cases.
     """
-    
+
     def test_health_response_format(self, test_client):
         """
         Health endpoint should return consistent JSON format.
         """
         response = test_client.get("/health")
         data = response.json()
-        
+
         assert "status" in data
         assert "server" in data
         assert "version" in data
-    
+
     def test_ready_response_format(self, test_client):
         """
         Ready endpoint should return consistent JSON format.
         """
         response = test_client.get("/ready")
         data = response.json()
-        
+
         assert "ready" in data
         assert "server" in data
-    
+
     def test_unauthorized_response_format(self, test_client, no_auth_headers):
         """
         Unauthorized responses should include WWW-Authenticate header.
         """
         response = test_client.get("/tools", headers=no_auth_headers)
-        
+
         assert response.status_code == 401
         assert "www-authenticate" in response.headers

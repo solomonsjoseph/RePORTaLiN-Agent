@@ -19,7 +19,7 @@ Standards Compliance:
 Usage:
     >>> from fastapi import FastAPI
     >>> from server.security.middleware import SecurityHeadersMiddleware
-    >>> 
+    >>>
     >>> app = FastAPI()
     >>> app.add_middleware(SecurityHeadersMiddleware)
 
@@ -30,24 +30,28 @@ See Also:
 
 from __future__ import annotations
 
-from typing import Callable, Any
+from typing import TYPE_CHECKING, Any
 
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import Response
-from starlette.types import ASGIApp, Receive, Scope, Send
 
 from server.security.rate_limiter import (
-    RateLimiter,
-    RateLimitResult,
     InMemoryRateLimiter,
     RateLimitConfig,
+    RateLimiter,
+    RateLimitResult,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from starlette.requests import Request
+    from starlette.responses import Response
+    from starlette.types import ASGIApp, Receive, Scope, Send
+
 __all__ = [
-    "SecurityHeadersMiddleware",
     "InputValidationMiddleware",
     "RateLimitMiddleware",
+    "SecurityHeadersMiddleware",
 ]
 
 
@@ -69,21 +73,21 @@ MAX_HEADER_VALUE_LENGTH = 8192
 DEFAULT_SECURITY_HEADERS: dict[str, str] = {
     # Prevent MIME type sniffing
     "X-Content-Type-Options": "nosniff",
-    
+
     # Prevent clickjacking
     "X-Frame-Options": "DENY",
-    
+
     # Enable XSS filter (legacy browsers)
     "X-XSS-Protection": "1; mode=block",
-    
+
     # Control referrer information
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    
+
     # Prevent caching of sensitive responses
     "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
     "Pragma": "no-cache",
     "Expires": "0",
-    
+
     # Content Security Policy - restrictive default
     # Allows self-origin only, inline styles for docs UI
     "Content-Security-Policy": (
@@ -95,11 +99,11 @@ DEFAULT_SECURITY_HEADERS: dict[str, str] = {
         "frame-ancestors 'none'; "
         "form-action 'self'"
     ),
-    
+
     # Cross-Origin policies
     "Cross-Origin-Opener-Policy": "same-origin",
     "Cross-Origin-Resource-Policy": "same-origin",
-    
+
     # Permissions Policy - disable unnecessary features
     "Permissions-Policy": (
         "accelerometer=(), "
@@ -121,10 +125,10 @@ DEFAULT_SECURITY_HEADERS: dict[str, str] = {
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
     Middleware that adds security headers to all responses.
-    
+
     This middleware adds headers recommended by OWASP and security best
     practices to protect against common web vulnerabilities:
-    
+
     Headers Added:
         - X-Content-Type-Options: nosniff (prevent MIME sniffing)
         - X-Frame-Options: DENY (prevent clickjacking)
@@ -133,20 +137,20 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         - Content-Security-Policy: restrictive CSP
         - Cache-Control: no-store (prevent caching)
         - Various Cross-Origin policies
-    
+
     Configuration:
         Pass custom headers dict to override defaults:
-        
+
         >>> app.add_middleware(
         ...     SecurityHeadersMiddleware,
         ...     custom_headers={"X-Custom": "value"}
         ... )
-    
+
     Note:
         Some headers may conflict with specific features (e.g., CSP
         may block external resources). Adjust as needed for your app.
     """
-    
+
     def __init__(
         self,
         app: ASGIApp,
@@ -155,7 +159,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     ) -> None:
         """
         Initialize security headers middleware.
-        
+
         Args:
             app: The ASGI application
             custom_headers: Additional headers to add/override defaults
@@ -166,7 +170,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if custom_headers:
             self.headers.update(custom_headers)
         self.exclude_paths = exclude_paths or set()
-    
+
     async def dispatch(
         self,
         request: Request,
@@ -174,17 +178,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         """Add security headers to response."""
         response = await call_next(request)
-        
+
         # Skip excluded paths (e.g., health checks)
         if request.url.path in self.exclude_paths:
             return response
-        
+
         # Add security headers
         for name, value in self.headers.items():
             # Don't override if already set
             if name not in response.headers:
                 response.headers[name] = value
-        
+
         return response
 
 
@@ -195,31 +199,31 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 class InputValidationMiddleware:
     """
     ASGI middleware that validates request input parameters.
-    
+
     This middleware protects against denial-of-service attacks via
     oversized inputs. It validates:
-    
+
     - Query parameter individual lengths
     - Total query string length
     - Header value lengths
-    
+
     Validation Limits:
         - Single query param: 2,048 bytes
         - Total query string: 8,192 bytes
         - Header value: 8,192 bytes
-    
+
     Security Rationale:
         Large query parameters can:
         - Exhaust memory during parsing
         - Enable ReDoS attacks on regex validators
         - Bypass WAF rules via overflow
-        
+
     Usage:
         >>> from starlette.applications import Starlette
         >>> app = Starlette()
         >>> app = InputValidationMiddleware(app)
     """
-    
+
     def __init__(
         self,
         app: ASGIApp,
@@ -229,7 +233,7 @@ class InputValidationMiddleware:
     ) -> None:
         """
         Initialize input validation middleware.
-        
+
         Args:
             app: The ASGI application to wrap
             max_query_param_length: Max bytes for single query param
@@ -240,7 +244,7 @@ class InputValidationMiddleware:
         self.max_query_param_length = max_query_param_length
         self.max_query_string_length = max_query_string_length
         self.max_header_value_length = max_header_value_length
-    
+
     async def __call__(
         self,
         scope: Scope,
@@ -252,7 +256,7 @@ class InputValidationMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        
+
         # Validate query string length
         query_string = scope.get("query_string", b"")
         if len(query_string) > self.max_query_string_length:
@@ -263,7 +267,7 @@ class InputValidationMiddleware:
                 detail=f"Query string exceeds {self.max_query_string_length} bytes",
             )
             return
-        
+
         # Validate individual query parameters
         if query_string:
             try:
@@ -280,7 +284,7 @@ class InputValidationMiddleware:
             except Exception:
                 # If we can't parse, let downstream handle it
                 pass
-        
+
         # Validate header lengths
         headers = scope.get("headers", [])
         for name, value in headers:
@@ -293,10 +297,10 @@ class InputValidationMiddleware:
                     detail=f"Header '{header_name}' exceeds {self.max_header_value_length} bytes",
                 )
                 return
-        
+
         # Validation passed - forward to app
         await self.app(scope, receive, send)
-    
+
     async def _send_error(
         self,
         send: Send,
@@ -306,12 +310,12 @@ class InputValidationMiddleware:
     ) -> None:
         """Send an error response."""
         import json
-        
+
         body = json.dumps({
             "error": error,
             "detail": detail,
         }).encode("utf-8")
-        
+
         await send({
             "type": "http.response.start",
             "status": status,
@@ -333,30 +337,30 @@ class InputValidationMiddleware:
 class RateLimitMiddleware:
     """
     ASGI middleware that enforces request rate limits.
-    
+
     This middleware integrates with the RateLimiter backend to enforce
     per-client rate limits. Clients are identified by:
-    
+
     1. X-Forwarded-For header (if behind proxy)
     2. X-Real-IP header (nginx)
     3. Client IP from connection
-    
+
     Responses include rate limit headers:
         - X-RateLimit-Limit: Total requests allowed
         - X-RateLimit-Remaining: Requests remaining in window
         - X-RateLimit-Reset: Unix timestamp of window reset
         - Retry-After: Seconds to wait (when blocked)
-    
+
     Configuration:
         >>> from server.security.rate_limiter import RateLimitConfig
         >>> config = RateLimitConfig(requests_per_minute=60)
         >>> app = RateLimitMiddleware(app, config)
-        
+
     Exclusions:
         Health check endpoints are excluded by default to allow
         monitoring systems unlimited access.
     """
-    
+
     def __init__(
         self,
         app: ASGIApp,
@@ -367,7 +371,7 @@ class RateLimitMiddleware:
     ) -> None:
         """
         Initialize rate limit middleware.
-        
+
         Args:
             app: The ASGI application to wrap
             config: Rate limit configuration (creates InMemoryRateLimiter)
@@ -376,49 +380,49 @@ class RateLimitMiddleware:
             client_id_extractor: Custom function to extract client ID from scope
         """
         self.app = app
-        
+
         # Use provided limiter or create from config
         if limiter:
             self.limiter = limiter
         else:
             config = config or RateLimitConfig()
             self.limiter = InMemoryRateLimiter(config)
-        
+
         # Default exclusions: health checks
         self.exclude_paths = exclude_paths or {"/health", "/ready"}
-        
+
         # Client ID extractor
         self.client_id_extractor = client_id_extractor or self._default_client_id
-    
+
     def _default_client_id(self, scope: Scope) -> str:
         """
         Extract client identifier from request scope.
-        
+
         Priority:
         1. X-Forwarded-For (first IP, if behind proxy)
         2. X-Real-IP (nginx)
         3. Connection client IP
         """
         headers = dict(scope.get("headers", []))
-        
+
         # Check X-Forwarded-For (may have multiple IPs)
         forwarded = headers.get(b"x-forwarded-for", b"").decode()
         if forwarded:
             # Take first IP (original client)
             return forwarded.split(",")[0].strip()
-        
+
         # Check X-Real-IP
         real_ip = headers.get(b"x-real-ip", b"").decode()
         if real_ip:
             return real_ip
-        
+
         # Fall back to connection IP
         client = scope.get("client")
         if client:
             return client[0]
-        
+
         return "unknown"
-    
+
     async def __call__(
         self,
         scope: Scope,
@@ -430,16 +434,16 @@ class RateLimitMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        
+
         # Check exclusions
         path = scope.get("path", "")
         if path in self.exclude_paths:
             await self.app(scope, receive, send)
             return
-        
+
         # Extract client ID
         client_id = self.client_id_extractor(scope)
-        
+
         # Check rate limit
         try:
             result = await self.limiter.check(client_id)
@@ -447,11 +451,11 @@ class RateLimitMiddleware:
             # On limiter failure, allow request (fail open)
             await self.app(scope, receive, send)
             return
-        
+
         if not result.allowed:
             await self._send_rate_limit_error(send, result)
             return
-        
+
         # Wrap send to add rate limit headers to response
         async def send_with_headers(message: dict) -> None:
             if message["type"] == "http.response.start":
@@ -460,9 +464,9 @@ class RateLimitMiddleware:
                     headers.append((name.lower().encode(), value.encode()))
                 message = {**message, "headers": headers}
             await send(message)
-        
+
         await self.app(scope, receive, send_with_headers)
-    
+
     async def _send_rate_limit_error(
         self,
         send: Send,
@@ -470,22 +474,22 @@ class RateLimitMiddleware:
     ) -> None:
         """Send 429 Too Many Requests response."""
         import json
-        
+
         body = json.dumps({
             "error": "rate_limit_exceeded",
             "detail": "Too many requests. Please retry later.",
             "retry_after": int(result.retry_after) + 1,
         }).encode("utf-8")
-        
+
         headers = [
             (b"content-type", b"application/json"),
             (b"content-length", str(len(body)).encode()),
         ]
-        
+
         # Add rate limit headers
         for name, value in result.to_headers().items():
             headers.append((name.lower().encode(), value.encode()))
-        
+
         await send({
             "type": "http.response.start",
             "status": 429,

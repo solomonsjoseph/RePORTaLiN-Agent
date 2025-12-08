@@ -404,16 +404,48 @@ def mock_env_vars(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
 
 
 # =============================================================================
-# MCP Tool Test Fixtures
+# MCP Tool Test Fixtures (SECURE MODE - 2 Tools Only)
 # =============================================================================
 
 @pytest.fixture
-def query_database_input():
+def explore_study_metadata_input():
     """
-    Create a valid QueryDatabaseInput for testing.
+    Create a valid ExploreStudyMetadataInput for testing.
     
     Returns:
-        Dictionary with valid query parameters
+        Dictionary with valid metadata query parameters
+    """
+    return {
+        "query": "Do we have any participants from Pune with follow-up data?",
+        "site_filter": None,
+        "time_point_filter": None,
+    }
+
+
+@pytest.fixture
+def build_technical_request_input():
+    """
+    Create a valid BuildTechnicalRequestInput for testing.
+    
+    Returns:
+        Dictionary with valid technical request parameters
+    """
+    return {
+        "description": "Analyze treatment outcomes in TB patients",
+        "inclusion_criteria": ["Female", "Age 18-45"],
+        "exclusion_criteria": ["HIV co-infection"],
+        "variables_of_interest": ["Age", "Sex", "TB_Status"],
+        "time_points": ["Baseline", "Month 6"],
+        "output_format": "concept_sheet",
+    }
+
+
+# Legacy fixtures kept for backwards compatibility during transition
+@pytest.fixture
+def query_database_input():
+    """
+    DEPRECATED: Old fixture kept for reference.
+    Use explore_study_metadata_input or build_technical_request_input instead.
     """
     return {
         "query": "SELECT * FROM patients WHERE age > 18",
@@ -425,10 +457,8 @@ def query_database_input():
 @pytest.fixture
 def search_dictionary_input():
     """
-    Create a valid SearchDictionaryInput for testing.
-    
-    Returns:
-        Dictionary with valid search parameters
+    DEPRECATED: Old fixture kept for reference.
+    Use explore_study_metadata_input instead.
     """
     return {
         "search_term": "patient_id",
@@ -440,10 +470,8 @@ def search_dictionary_input():
 @pytest.fixture
 def fetch_metrics_input():
     """
-    Create a valid FetchMetricsInput for testing.
-    
-    Returns:
-        Dictionary with valid metrics parameters
+    DEPRECATED: Old fixture kept for reference.
+    Use explore_study_metadata_input instead.
     """
     return {
         "metric_type": "count",

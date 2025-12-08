@@ -44,28 +44,31 @@ import threading
 import traceback
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Generator, Optional
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from pathlib import Path
 
 # Public API
 __all__ = [
-    # Core classes
-    "StructuredLogger",
-    "BoundLogger",
-    "JSONFormatter",
-    # Factory functions
-    "get_structured_logger",
-    "configure_logging",
-    "setup_structured_logging",
-    # Context management
-    "log_context",
-    "get_current_context",
-    "set_context",
-    "clear_context",
     # PHI utilities
     "PHI_PATTERNS",
-    "_redact_phi",  # Exposed for log_decryptor.py
+    "BoundLogger",
+    "JSONFormatter",
+    # Core classes
+    "StructuredLogger",
     "_is_phi_key",
+    "_redact_phi",  # Exposed for log_decryptor.py
+    "clear_context",
+    "configure_logging",
+    "get_current_context",
+    # Factory functions
+    "get_structured_logger",
+    # Context management
+    "log_context",
+    "set_context",
+    "setup_structured_logging",
 ]
 
 # Context variable for request-scoped log context
@@ -157,7 +160,7 @@ class JSONFormatter(logging.Formatter):
         *,
         include_timestamp: bool = True,
         redact_phi: bool = True,
-        indent: Optional[int] = None,
+        indent: int | None = None,
     ) -> None:
         """Initialize JSON formatter.
 
@@ -273,7 +276,7 @@ class StructuredLogger:
         """
         self.name = name
         self.redact_phi = redact_phi
-        self._logger: Optional[logging.Logger] = None
+        self._logger: logging.Logger | None = None
 
     @property
     def logger(self) -> logging.Logger:
@@ -339,7 +342,7 @@ class StructuredLogger:
         """Log ERROR message with exception info."""
         self._log(logging.ERROR, msg, *args, exc_info=True, **kwargs)
 
-    def bind(self, **kwargs: Any) -> "BoundLogger":
+    def bind(self, **kwargs: Any) -> BoundLogger:
         """Create a new logger with bound context.
 
         Args:
@@ -384,7 +387,7 @@ class BoundLogger:
     def exception(self, msg: str, *args: Any, **kwargs: Any) -> None:
         self._logger.exception(msg, *args, **{**self._context, **kwargs})
 
-    def bind(self, **kwargs: Any) -> "BoundLogger":
+    def bind(self, **kwargs: Any) -> BoundLogger:
         """Create a new bound logger with additional context."""
         return BoundLogger(self._logger, {**self._context, **kwargs})
 
@@ -481,7 +484,7 @@ def configure_logging(
     level: str = "INFO",
     json_output: bool = False,
     verbose: bool = False,
-    log_file: Optional[Path] = None,
+    log_file: Path | None = None,
     redact_phi: bool = True,
 ) -> None:
     """Configure the logging system.

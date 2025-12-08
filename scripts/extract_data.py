@@ -49,15 +49,15 @@ from scripts.utils import logging as log
 vlog = log.get_verbose_logger()
 
 __all__ = [
-    # Main Functions
-    "extract_excel_to_jsonl",
-    # File Processing
-    "process_excel_file",
-    "find_excel_files",
+    "clean_duplicate_columns",
+    "clean_record_for_json",
     # Data Conversion
     "convert_dataframe_to_jsonl",
-    "clean_record_for_json",
-    "clean_duplicate_columns",
+    # Main Functions
+    "extract_excel_to_jsonl",
+    "find_excel_files",
+    # File Processing
+    "process_excel_file",
 ]
 
 

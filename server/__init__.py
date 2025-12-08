@@ -28,77 +28,83 @@ Example:
     >>> settings = get_settings()
     >>> logger = get_logger(__name__)
     >>> logger.info("Server initialized", port=settings.mcp_port)
-    
+
     # Or run the server directly:
     >>> from server import run_server
     >>> run_server(host="0.0.0.0", port=8000)
 """
 
-from server.config import Settings, get_settings, get_project_root, Environment, LogLevel
+from server.auth import (
+    AuthContext,
+    generate_token,
+    optional_auth,
+    require_auth,
+    verify_token,
+)
+from server.config import (
+    Environment,
+    LogLevel,
+    Settings,
+    get_project_root,
+    get_settings,
+)
 from server.logger import (
-    configure_logging,
-    get_logger,
     bind_context,
     clear_context,
+    configure_logging,
+    get_logger,
     get_request_id,
     set_request_id,
 )
-from server.auth import (
-    AuthContext,
-    require_auth,
-    optional_auth,
-    verify_token,
-    generate_token,
-)
-from server.tools import mcp, get_tool_registry
 from server.main import app, base_app, create_app, create_secured_app, run_server
 
 # Security module exports (lazy import to avoid circular dependencies)
 from server.security import (
     AES256GCMCipher,
-    RateLimiter,
-    RateLimitConfig,
-    SecurityHeadersMiddleware,
     InputValidationMiddleware,
+    RateLimitConfig,
+    RateLimiter,
     RateLimitMiddleware,
     RotatableSecret,
+    SecurityHeadersMiddleware,
 )
+from server.tools import get_tool_registry, mcp
 
 __all__ = [
-    # Configuration
-    "Settings",
-    "get_settings",
-    "get_project_root",
-    "Environment",
-    "LogLevel",
-    # Logging
-    "configure_logging",
-    "get_logger",
-    "bind_context",
-    "clear_context",
-    "get_request_id",
-    "set_request_id",
+    # Security
+    "AES256GCMCipher",
     # Authentication
     "AuthContext",
-    "require_auth",
-    "optional_auth",
-    "verify_token",
-    "generate_token",
-    # MCP Server
-    "mcp",
-    "get_tool_registry",
+    "Environment",
+    "InputValidationMiddleware",
+    "LogLevel",
+    "RateLimitConfig",
+    "RateLimitMiddleware",
+    "RateLimiter",
+    "RotatableSecret",
+    "SecurityHeadersMiddleware",
+    # Configuration
+    "Settings",
     # FastAPI Application
     "app",
     "base_app",
+    "bind_context",
+    "clear_context",
+    # Logging
+    "configure_logging",
     "create_app",
     "create_secured_app",
+    "generate_token",
+    "get_logger",
+    "get_project_root",
+    "get_request_id",
+    "get_settings",
+    "get_tool_registry",
+    # MCP Server
+    "mcp",
+    "optional_auth",
+    "require_auth",
     "run_server",
-    # Security
-    "AES256GCMCipher",
-    "RateLimiter",
-    "RateLimitConfig",
-    "SecurityHeadersMiddleware",
-    "InputValidationMiddleware",
-    "RateLimitMiddleware",
-    "RotatableSecret",
+    "set_request_id",
+    "verify_token",
 ]

@@ -10,9 +10,8 @@ These tests verify the complete MCP server setup including:
 Run with: pytest tests/integration/test_server_startup.py -v
 """
 
-import os
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 # Test token - must match conftest.py
 TEST_AUTH_TOKEN = "test-secret-token-12345"
@@ -32,7 +31,7 @@ pytestmark = [
 def configured_app(monkeypatch):
     """
     Get the FastAPI application with proper auth configuration.
-    
+
     This fixture ensures:
     1. MCP_AUTH_TOKEN is set BEFORE importing server modules
     2. All caches are cleared so auth is properly configured
@@ -41,14 +40,14 @@ def configured_app(monkeypatch):
     monkeypatch.setenv("MCP_AUTH_TOKEN", TEST_AUTH_TOKEN)
     monkeypatch.setenv("MCP_AUTH_ENABLED", "true")
     monkeypatch.setenv("ENVIRONMENT", "local")
-    
+
     # Clear all caches
     from server.config import get_settings
     get_settings.cache_clear()
-    
+
     from server.auth import get_rotatable_secret
     get_rotatable_secret.cache_clear()
-    
+
     # Now import and return the app
     from server.main import base_app
     return base_app
@@ -63,10 +62,6 @@ def test_server_import():
     from server import (
         app,
         mcp,
-        get_settings,
-        get_logger,
-        require_auth,
-        run_server,
     )
     assert app is not None
     assert mcp is not None
@@ -87,17 +82,25 @@ def test_settings_load():
 
 @pytest.mark.asyncio
 async def test_tools_registered():
-    """Test that all expected tools are registered."""
+    """Test that all expected tools are registered (SECURE MODE - only 2 tools)."""
     from server.tools import mcp
     tools = await mcp.list_tools()
-    
+
     tool_names = [t.name for t in tools]
-    
-    # Verify expected tools exist
-    assert "query_database" in tool_names
-    assert "search_dictionary" in tool_names
-    assert "fetch_metrics" in tool_names
-    assert "health_check" in tool_names
+
+    # Verify ONLY the two secure tools exist
+    assert "explore_study_metadata" in tool_names
+    assert "build_technical_request" in tool_names
+
+    # Verify old tools are NOT present (security check)
+    assert "query_database" not in tool_names
+    assert "search_dictionary" not in tool_names
+    assert "fetch_metrics" not in tool_names
+    assert "list_datasets" not in tool_names
+    assert "describe_schema" not in tool_names
+
+    # Verify we have exactly 2 tools
+    assert len(tool_names) == 2
 
 
 @pytest.mark.asyncio
@@ -105,16 +108,16 @@ async def test_tool_schemas():
     """Test that all tools have valid JSON schemas."""
     from server.tools import mcp
     tools = await mcp.list_tools()
-    
+
     for tool in tools:
         # Every tool should have a name
         assert tool.name is not None
         assert len(tool.name) > 0
-        
+
         # Every tool should have a description (for LLM selection)
         assert tool.description is not None
         assert len(tool.description) > 10  # Should be descriptive
-        
+
         # Input schema should be valid JSON schema
         if tool.inputSchema:
             assert "type" in tool.inputSchema
@@ -125,9 +128,9 @@ def test_tool_registry():
     """Test the tool registry utility."""
     from server.tools import get_tool_registry
     from shared.constants import SERVER_NAME, SERVER_VERSION
-    
+
     registry = get_tool_registry()
-    
+
     assert registry["server_name"] == SERVER_NAME
     assert registry["version"] == SERVER_VERSION
     assert len(registry["registered_tools"]) >= 4
@@ -141,11 +144,11 @@ def test_tool_registry():
 async def test_health_endpoint(configured_app):
     """Test health check endpoint (no auth required)."""
     from shared.constants import SERVER_NAME
-    
+
     transport = ASGITransport(app=configured_app)
     async with AsyncClient(transport=transport, base_url="http://localhost:8000") as client:
         response = await client.get("/health")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
@@ -158,7 +161,7 @@ async def test_ready_endpoint(configured_app):
     transport = ASGITransport(app=configured_app)
     async with AsyncClient(transport=transport, base_url="http://localhost:8000") as client:
         response = await client.get("/ready")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["ready"] is True
@@ -170,7 +173,7 @@ async def test_tools_endpoint_requires_auth(configured_app):
     transport = ASGITransport(app=configured_app)
     async with AsyncClient(transport=transport, base_url="http://localhost:8000") as client:
         response = await client.get("/tools")
-        
+
         # Should fail without auth
         assert response.status_code == 401
 
@@ -184,7 +187,7 @@ async def test_tools_endpoint_with_auth(configured_app):
             "/tools",
             headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert "tools" in data
@@ -201,7 +204,7 @@ async def test_mcp_sse_requires_auth(configured_app):
     transport = ASGITransport(app=configured_app)
     async with AsyncClient(transport=transport, base_url="http://localhost:8000") as client:
         response = await client.get("/mcp/sse")
-        
+
         # Should fail without auth
         assert response.status_code == 401
 

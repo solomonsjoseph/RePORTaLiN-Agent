@@ -34,7 +34,7 @@ import logging
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar
 
 from pydantic import (
     Field,
@@ -52,14 +52,14 @@ except ImportError:
 
 # Public API
 __all__ = [
+    "EncryptionSettings",
     # Enums
     "LogLevel",
-    "TransportMode",
+    "LoggingSettings",
+    "MCPSettings",
     # Settings classes
     "Settings",
-    "LoggingSettings",
-    "EncryptionSettings",
-    "MCPSettings",
+    "TransportMode",
     # Factory functions
     "get_settings",
     "reload_settings",
@@ -102,15 +102,15 @@ class EncryptionSettings(BaseSettings):
     )
 
     # Key management
-    public_key_path: Optional[Path] = Field(
+    public_key_path: Path | None = Field(
         default=None,
         description="Path to RSA public key for log encryption",
     )
-    private_key_path: Optional[Path] = Field(
+    private_key_path: Path | None = Field(
         default=None,
         description="Path to RSA private key for log decryption (maintainers only)",
     )
-    private_key_password: Optional[SecretStr] = Field(
+    private_key_password: SecretStr | None = Field(
         default=None,
         description="Password for encrypted private key file",
     )
@@ -131,7 +131,7 @@ class EncryptionSettings(BaseSettings):
 
     @field_validator("public_key_path", "private_key_path", mode="before")
     @classmethod
-    def resolve_path(cls, v: Any) -> Optional[Path]:
+    def resolve_path(cls, v: Any) -> Path | None:
         """Resolve and validate key paths."""
         if v is None:
             return None
@@ -211,7 +211,7 @@ class LoggingSettings(BaseSettings):
         return v
 
     @model_validator(mode="after")
-    def set_verbose_level(self) -> "LoggingSettings":
+    def set_verbose_level(self) -> LoggingSettings:
         """Set DEBUG level when verbose is enabled."""
         if self.verbose:
             self.level = LogLevel.DEBUG
@@ -328,11 +328,11 @@ class Settings(BaseSettings):
         default_factory=lambda: Path(__file__).parent.parent.parent,
         description="Project root directory",
     )
-    data_dir: Optional[Path] = Field(
+    data_dir: Path | None = Field(
         default=None,
         description="Data directory path",
     )
-    results_dir: Optional[Path] = Field(
+    results_dir: Path | None = Field(
         default=None,
         description="Results output directory",
     )
@@ -352,7 +352,7 @@ class Settings(BaseSettings):
     DEFAULT_DATASET_NAME: ClassVar[str] = "RePORTaLiN_sample"
 
     @model_validator(mode="after")
-    def resolve_paths(self) -> "Settings":
+    def resolve_paths(self) -> Settings:
         """Resolve default paths relative to root_dir."""
         if self.data_dir is None:
             self.data_dir = self.root_dir / "data"

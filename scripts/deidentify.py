@@ -54,17 +54,17 @@ from typing import Any
 # ...existing code...
 
 __all__ = [
-    # Enums
-    "PHIType",
+    "DateShifter",
+    "DeidentificationConfig",
+    "DeidentificationEngine",
     # Data Classes
     "DetectionPattern",
-    "DeidentificationConfig",
+    "MappingStore",
+    # Enums
+    "PHIType",
     # Core Classes
     "PatternLibrary",
     "PseudonymGenerator",
-    "DateShifter",
-    "MappingStore",
-    "DeidentificationEngine",
     # Top-level Functions
     "deidentify_dataset",
     "validate_dataset",
@@ -73,8 +73,13 @@ __all__ = [
 # Optional imports
 try:
     from cryptography.fernet import Fernet
+
     # Import AES-256-GCM cipher for improved security
-    from server.security.encryption import AES256GCMCipher, EncryptionError, DecryptionError
+    from server.security.encryption import (
+        AES256GCMCipher,
+        DecryptionError,
+        EncryptionError,
+    )
 
     CRYPTO_AVAILABLE = True
     AES256_AVAILABLE = True
@@ -751,13 +756,13 @@ class MappingStore:
     - JSON serialization
     - Audit logging
     - Backward compatibility with Fernet-encrypted files
-    
+
     Security Upgrade (2025):
         This class now uses AES-256-GCM for new encryptions, providing:
         - 256-bit keys (vs Fernet's 128-bit)
         - Authenticated encryption (detects tampering)
         - No padding oracle vulnerabilities
-        
+
         Existing Fernet-encrypted files are automatically detected and
         can still be decrypted for migration purposes.
     """
@@ -831,7 +836,7 @@ class MappingStore:
     def _detect_encryption_format(self, data: bytes) -> str:
         """
         Detect the encryption format of stored data.
-        
+
         Returns:
             'aes256gcm': AES-256-GCM format (JSON with 'v', 'n', 'c' fields)
             'fernet': Fernet format (starts with 'gAAAA')
@@ -865,7 +870,7 @@ class MappingStore:
 
             # Detect encryption format
             format_type = self._detect_encryption_format(data)
-            
+
             if format_type == "plaintext":
                 # Unencrypted JSON
                 decrypted_data = data
@@ -933,11 +938,11 @@ class MappingStore:
         except Exception as e:
             logging.exception(f"Failed to save mappings: {e}")
             raise
-    
+
     def get_encryption_info(self) -> dict[str, Any]:
         """
         Get information about the current encryption configuration.
-        
+
         Returns:
             Dictionary with encryption status and algorithm info
         """
@@ -1430,14 +1435,13 @@ def deidentify_dataset(
                     f"File {file_index}/{len(jsonl_files)}: {relative_path}"
                 ):
                     records_count = 0
-                    detections_count = 0
 
                     with vlog.step("Reading and de-identifying records"):
                         with (
                             open(jsonl_file, encoding="utf-8") as infile,
                             open(output_file, "w", encoding="utf-8") as outfile,
                         ):
-                            for line_num, line in enumerate(infile, 1):
+                            for _line_num, line in enumerate(infile, 1):
                                 if line.strip():
                                     record = json.loads(line)
                                     deidentified_record = engine.deidentify_record(

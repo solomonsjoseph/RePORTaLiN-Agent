@@ -13,16 +13,16 @@ Tests cover:
 """
 
 import time
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
 
 from server.auth import (
     AuthContext,
-    verify_token,
     generate_token,
     get_token_from_request,
+    verify_token,
 )
-
 
 # =============================================================================
 # AuthContext Tests
@@ -70,7 +70,7 @@ class TestAuthContext:
         before = time.time()
         ctx = AuthContext(is_authenticated=True)
         after = time.time()
-        
+
         assert before <= ctx.timestamp <= after
 
     def test_age_seconds_property(self) -> None:
@@ -163,7 +163,7 @@ class TestGenerateToken:
 
 class TestGetTokenFromRequest:
     """Tests for the get_token_from_request function.
-    
+
     Note: get_token_from_request is an async function that uses FastAPI
     Depends, so we test it by creating mock request objects and calling
     directly with resolved dependencies.
@@ -173,17 +173,17 @@ class TestGetTokenFromRequest:
     async def test_extract_bearer_token(self) -> None:
         """Test extracting Bearer token from Authorization header."""
         from fastapi.security import HTTPAuthorizationCredentials
-        
+
         request = MagicMock()
         request.headers = {}
         request.query_params = {}
-        
+
         # Create credentials object like HTTPBearer would
         credentials = HTTPAuthorizationCredentials(
             scheme="Bearer",
             credentials="mytoken123"
         )
-        
+
         token, method = await get_token_from_request(request, credentials)
         assert token == "mytoken123"
         assert method == "bearer"
@@ -194,7 +194,7 @@ class TestGetTokenFromRequest:
         request = MagicMock()
         request.headers = {"X-API-Key": "apikey456"}
         request.query_params = {}
-        
+
         token, method = await get_token_from_request(request, None)
         assert token == "apikey456"
         assert method == "api_key"
@@ -205,7 +205,7 @@ class TestGetTokenFromRequest:
         request = MagicMock()
         request.headers = {}
         request.query_params = {"token": "querytoken789"}
-        
+
         token, method = await get_token_from_request(request, None)
         assert token == "querytoken789"
         assert method == "query"
@@ -214,16 +214,16 @@ class TestGetTokenFromRequest:
     async def test_bearer_takes_precedence(self) -> None:
         """Test that Bearer header takes precedence over other methods."""
         from fastapi.security import HTTPAuthorizationCredentials
-        
+
         request = MagicMock()
         request.headers = {"X-API-Key": "apikey"}
         request.query_params = {"token": "querytoken"}
-        
+
         credentials = HTTPAuthorizationCredentials(
             scheme="Bearer",
             credentials="bearertoken"
         )
-        
+
         token, method = await get_token_from_request(request, credentials)
         assert token == "bearertoken"
         assert method == "bearer"
@@ -234,7 +234,7 @@ class TestGetTokenFromRequest:
         request = MagicMock()
         request.headers = {}
         request.query_params = {}
-        
+
         token, method = await get_token_from_request(request, None)
         assert token is None
         assert method == "none"
@@ -245,7 +245,7 @@ class TestGetTokenFromRequest:
         request = MagicMock()
         request.headers = {"X-API-Key": "apikey"}
         request.query_params = {"token": "querytoken"}
-        
+
         token, method = await get_token_from_request(request, None)
         assert token == "apikey"
         assert method == "api_key"

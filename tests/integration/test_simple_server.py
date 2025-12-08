@@ -4,9 +4,9 @@ Simple test to verify basic FastMCP tool registration.
 This is an integration test that verifies FastMCP tool registration.
 Run with: pytest tests/integration/ -m integration
 """
-import pytest
-
 from typing import Annotated
+
+import pytest
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 

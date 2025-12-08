@@ -26,17 +26,17 @@ Architecture:
 
 Usage:
     >>> from client.universal_client import UniversalMCPClient
-    >>> 
+    >>>
     >>> async with UniversalMCPClient(
     ...     server_url="http://localhost:8000/mcp/sse",
     ...     auth_token="your-secret-token"
     ... ) as client:
     ...     # For OpenAI-based agents
     ...     openai_tools = await client.get_tools_for_openai()
-    ...     
+    ...
     ...     # For Anthropic-based agents
     ...     anthropic_tools = await client.get_tools_for_anthropic()
-    ...     
+    ...
     ...     # Execute a tool call
     ...     result = await client.execute_tool("health_check", {})
     ...     print(result)
@@ -58,39 +58,34 @@ from __future__ import annotations
 # =============================================================================
 # Re-exports from mcp_client.py
 # =============================================================================
-
 from client.mcp_client import (
-    # Main client class
-    UniversalMCPClient,
-    
+    AnthropicTool,
+    MCPAuthenticationError,
     # Exception types
     MCPClientError,
     MCPConnectionError,
-    MCPAuthenticationError,
     MCPToolExecutionError,
-    
-    # Type definitions for LLM providers
-    OpenAITool,
     OpenAIFunction,
     OpenAIFunctionParameters,
-    AnthropicTool,
+    # Type definitions for LLM providers
+    OpenAITool,
+    # Main client class
+    UniversalMCPClient,
 )
 
 __all__ = [
-    # Primary export - the Universal Adapter
-    "UniversalMCPClient",
-    
+    "AnthropicTool",
+    "MCPAuthenticationError",
     # Exceptions for error handling
     "MCPClientError",
     "MCPConnectionError",
-    "MCPAuthenticationError",
     "MCPToolExecutionError",
-    
+    "OpenAIFunction",
+    "OpenAIFunctionParameters",
     # Type definitions for static typing
     "OpenAITool",
-    "OpenAIFunction", 
-    "OpenAIFunctionParameters",
-    "AnthropicTool",
+    # Primary export - the Universal Adapter
+    "UniversalMCPClient",
 ]
 
 
@@ -101,10 +96,10 @@ __all__ = [
 def get_supported_providers() -> list[str]:
     """
     Get list of supported LLM provider formats.
-    
+
     Returns:
         List of supported provider names
-        
+
     Example:
         >>> providers = get_supported_providers()
         >>> print(providers)
@@ -116,7 +111,7 @@ def get_supported_providers() -> list[str]:
 def get_adapter_version() -> str:
     """
     Get the Universal Adapter version.
-    
+
     Returns:
         Version string matching the project version
     """

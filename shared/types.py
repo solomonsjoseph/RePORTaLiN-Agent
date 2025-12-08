@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, TypeAlias, Literal
+from typing import Any, TypeAlias
 
 # JSON-compatible types (JSON-RPC 2.0 compliant)
 JsonPrimitive: TypeAlias = str | int | float | bool | None
@@ -22,7 +22,7 @@ JsonValue: TypeAlias = JsonPrimitive | JsonArray | JsonObject
 
 class TransportType(str, Enum):
     """Supported MCP transport types."""
-    
+
     STDIO = "stdio"
     HTTP = "http"
     SSE = "sse"
@@ -31,7 +31,7 @@ class TransportType(str, Enum):
 
 class LogLevel(str, Enum):
     """Log levels for structured logging."""
-    
+
     DEBUG = "debug"
     INFO = "info"
     WARNING = "warning"
@@ -41,7 +41,7 @@ class LogLevel(str, Enum):
 
 class PrivacyMode(str, Enum):
     """Privacy enforcement modes for clinical data."""
-    
+
     STRICT = "strict"  # Full k-anonymity enforcement, suppress small cells
     STANDARD = "standard"  # Warn on small cells but return data
     PERMISSIVE = "permissive"  # No privacy restrictions (development only)
@@ -49,7 +49,7 @@ class PrivacyMode(str, Enum):
 
 class EnvironmentType(str, Enum):
     """Deployment environment types."""
-    
+
     LOCAL = "local"
     DEVELOPMENT = "development"
     STAGING = "staging"
@@ -60,19 +60,19 @@ class EnvironmentType(str, Enum):
 class ToolResult:
     """
     Standardized result from MCP tool execution.
-    
+
     Attributes:
         success: Whether the tool executed successfully
         data: The result data (if successful)
         error: Error message (if failed)
         metadata: Additional context about the execution
     """
-    
+
     success: bool
     data: JsonValue = None
     error: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> JsonObject:
         """Convert to JSON-serializable dictionary."""
         result: JsonObject = {"success": self.success}
@@ -89,13 +89,13 @@ class ToolResult:
 class ServerCapabilities:
     """
     MCP Server capabilities declaration.
-    
+
     Used during capability negotiation to inform clients
     what features this server supports.
-    
+
     Aligned with MCP 2025-03-26 specification.
     """
-    
+
     tools: bool = True
     resources: bool = True
     prompts: bool = False
@@ -110,17 +110,17 @@ class ServerCapabilities:
 class SecurityContext:
     """
     Security context for request processing.
-    
+
     Contains authentication and authorization information
     for the current request.
     """
-    
+
     authenticated: bool = False
     auth_method: str | None = None
     client_id: str | None = None
     scopes: frozenset[str] = field(default_factory=frozenset)
     rate_limit_remaining: int | None = None
-    
+
     @property
     def is_authenticated(self) -> bool:
         """Alias for authenticated for API consistency."""

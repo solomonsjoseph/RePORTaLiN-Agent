@@ -11,21 +11,18 @@ Note: These tests use mocks to avoid requiring a running server.
 Integration tests with a real server are in tests/integration/.
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from mcp import types
 
 from client.mcp_client import (
-    UniversalMCPClient,
+    MCPAuthenticationError,
     MCPClientError,
     MCPConnectionError,
-    MCPAuthenticationError,
     MCPToolExecutionError,
-    create_client,
+    UniversalMCPClient,
 )
-
 
 # =============================================================================
 # Test Fixtures
@@ -71,7 +68,7 @@ class TestClientInitialization:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         assert client.server_url == "http://localhost:8000/mcp/sse"
         assert client.is_connected is False
 
@@ -84,7 +81,7 @@ class TestClientInitialization:
             sse_read_timeout=600.0,
             cache_ttl_seconds=120.0,
         )
-        
+
         assert client._timeout == 60.0
         assert client._sse_read_timeout == 600.0
         assert client._cache_ttl == 120.0
@@ -103,10 +100,10 @@ class TestSchemaAdaptation:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         tool = sample_mcp_tools[0]  # query_database
         result = client._tool_to_openai(tool)
-        
+
         assert result["type"] == "function"
         assert result["function"]["name"] == "query_database"
         assert result["function"]["description"] == "Execute a SQL query on the database"
@@ -120,10 +117,10 @@ class TestSchemaAdaptation:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         tool = sample_mcp_tools[0]  # query_database
         result = client._tool_to_anthropic(tool)
-        
+
         assert result["name"] == "query_database"
         assert result["description"] == "Execute a SQL query on the database"
         assert result["input_schema"]["type"] == "object"
@@ -135,17 +132,17 @@ class TestSchemaAdaptation:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         tool = types.Tool(
             name="simple_tool",
             description="A simple tool",
             inputSchema={"type": "object", "properties": {}},
         )
-        
+
         openai_result = client._tool_to_openai(tool)
         assert openai_result["function"]["parameters"]["type"] == "object"
         assert openai_result["function"]["parameters"]["properties"] == {}
-        
+
         anthropic_result = client._tool_to_anthropic(tool)
         assert anthropic_result["input_schema"]["type"] == "object"
 
@@ -155,16 +152,16 @@ class TestSchemaAdaptation:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         tool = types.Tool(
             name="no_desc_tool",
             description=None,
             inputSchema={"type": "object"},
         )
-        
+
         openai_result = client._tool_to_openai(tool)
         assert "no_desc_tool" in openai_result["function"]["description"]
-        
+
         anthropic_result = client._tool_to_anthropic(tool)
         assert "no_desc_tool" in anthropic_result["description"]
 
@@ -182,12 +179,12 @@ class TestContentFlattening:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         content = [
             types.TextContent(type="text", text="Hello"),
             types.TextContent(type="text", text="World"),
         ]
-        
+
         result = client._flatten_content(content)
         assert result == "Hello\nWorld"
 
@@ -197,13 +194,13 @@ class TestContentFlattening:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         content = [
             types.TextContent(type="text", text="Before image"),
             types.ImageContent(type="image", data="base64data", mimeType="image/png"),
             types.TextContent(type="text", text="After image"),
         ]
-        
+
         result = client._flatten_content(content)
         assert "[Image Content]" in result
         assert "Before image" in result
@@ -215,7 +212,7 @@ class TestContentFlattening:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         result = client._flatten_content([])
         assert result == ""
 
@@ -233,7 +230,7 @@ class TestConnectionState:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         assert client.is_connected is False
         assert client.server_info == {}
 
@@ -243,7 +240,7 @@ class TestConnectionState:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         with pytest.raises(MCPConnectionError, match="Not connected"):
             client._ensure_connected()
 
@@ -254,10 +251,10 @@ class TestConnectionState:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         # Manually set connected state
         client._state.connected = True
-        
+
         with pytest.raises(MCPConnectionError, match="already connected"):
             await client.connect()
 
@@ -288,7 +285,7 @@ class TestExceptions:
             tool_name="query_database",
             is_error=True,
         )
-        
+
         assert str(error) == "Tool failed"
         assert error.tool_name == "query_database"
         assert error.is_error is True
@@ -308,16 +305,16 @@ class TestMockConnection:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         # Mock the session
         mock_session = AsyncMock()
         mock_session.list_tools.return_value = MagicMock(tools=sample_mcp_tools)
-        
+
         client._session = mock_session
         client._state.connected = True
-        
+
         tools = await client.list_tools(use_cache=False)
-        
+
         assert len(tools) == 2
         assert tools[0].name == "query_database"
         mock_session.list_tools.assert_called_once()
@@ -329,15 +326,15 @@ class TestMockConnection:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         mock_session = AsyncMock()
         mock_session.list_tools.return_value = MagicMock(tools=sample_mcp_tools)
-        
+
         client._session = mock_session
         client._state.connected = True
-        
+
         tools = await client.get_tools_for_openai()
-        
+
         assert len(tools) == 2
         assert all(t["type"] == "function" for t in tools)
         assert tools[0]["function"]["name"] == "query_database"
@@ -349,15 +346,15 @@ class TestMockConnection:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         mock_session = AsyncMock()
         mock_session.list_tools.return_value = MagicMock(tools=sample_mcp_tools)
-        
+
         client._session = mock_session
         client._state.connected = True
-        
+
         tools = await client.get_tools_for_anthropic()
-        
+
         assert len(tools) == 2
         assert tools[0]["name"] == "query_database"
         assert "input_schema" in tools[0]
@@ -369,22 +366,22 @@ class TestMockConnection:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         # Mock tool result
         mock_result = MagicMock()
         mock_result.isError = False
         mock_result.content = [
             types.TextContent(type="text", text='{"status": "healthy"}'),
         ]
-        
+
         mock_session = AsyncMock()
         mock_session.call_tool.return_value = mock_result
-        
+
         client._session = mock_session
         client._state.connected = True
-        
+
         result = await client.execute_tool("health_check", {})
-        
+
         assert '{"status": "healthy"}' in result
         mock_session.call_tool.assert_called_once_with("health_check", {})
 
@@ -395,23 +392,23 @@ class TestMockConnection:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         # Mock error result
         mock_result = MagicMock()
         mock_result.isError = True
         mock_result.content = [
             types.TextContent(type="text", text="Query validation failed"),
         ]
-        
+
         mock_session = AsyncMock()
         mock_session.call_tool.return_value = mock_result
-        
+
         client._session = mock_session
         client._state.connected = True
-        
+
         with pytest.raises(MCPToolExecutionError) as exc_info:
             await client.execute_tool("query_database", {"query": "invalid"})
-        
+
         assert exc_info.value.tool_name == "query_database"
         assert "Query validation failed" in str(exc_info.value)
 
@@ -431,17 +428,17 @@ class TestToolsCache:
             auth_token="test-token",
             cache_ttl_seconds=60.0,
         )
-        
+
         mock_session = AsyncMock()
         mock_session.list_tools.return_value = MagicMock(tools=sample_mcp_tools)
-        
+
         client._session = mock_session
         client._state.connected = True
-        
+
         # First call fetches
         await client.list_tools()
         assert mock_session.list_tools.call_count == 1
-        
+
         # Second call uses cache
         await client.list_tools()
         assert mock_session.list_tools.call_count == 1  # Still 1
@@ -453,16 +450,16 @@ class TestToolsCache:
             server_url="http://localhost:8000/mcp/sse",
             auth_token="test-token",
         )
-        
+
         mock_session = AsyncMock()
         mock_session.list_tools.return_value = MagicMock(tools=sample_mcp_tools)
-        
+
         client._session = mock_session
         client._state.connected = True
-        
+
         # First call fetches
         await client.list_tools()
-        
+
         # Second call with use_cache=False fetches again
         await client.list_tools(use_cache=False)
         assert mock_session.list_tools.call_count == 2
