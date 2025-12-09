@@ -6,7 +6,7 @@ Target Audience: Developers integrating with Claude Desktop
 Prerequisites: Python 3.10+, basic CLI familiarity
 -->
 
-> **Type**: How-to Guide | **Updated**: 2025-12-05 | **Status**: ✅ Verified
+> **Type**: How-to Guide | **Updated**: 2025-12-08 | **Status**: ✅ Verified
 
 This guide walks you through setting up the RePORTaLiN MCP server for Claude Desktop or other MCP-compatible clients.
 
@@ -245,8 +245,8 @@ uv run python -c "from server.__main__ import main; print('Entry point OK')"
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | \
   NO_COLOR=1 TERM=dumb uv run python -m server
 
-# 4. Run integration tests
-uv run python tests/integration/test_server_startup.py
+# 4. Verify server is operational
+uv run python verify.py --verbose
 ```
 
 ## Security Features
@@ -268,12 +268,13 @@ The MCP server enforces privacy protections:
 server/
 ├── __init__.py           # Package initialization
 ├── __main__.py           # Entry point with stdio isolation
-├── server.py             # FastMCP server and tool definitions
-├── models.py             # Pydantic schemas for tools
-├── tools.py              # Tool implementation logic
-├── study_variables.py    # Variable search/lookup
-├── crypto_logger.py      # Encrypted audit logging
-└── privacy_aggregates.py # K-anonymity aggregation
+├── main.py               # FastMCP server and HTTP endpoints
+├── tools.py              # MCP tool definitions and implementation
+├── auth.py               # Bearer token authentication
+├── config.py             # Server configuration
+├── data_pipeline.py      # Data pipeline connector
+├── logger.py             # Structured logging
+└── security/             # Security modules (encryption, rate limiting)
 ```
 
 ## Next Steps

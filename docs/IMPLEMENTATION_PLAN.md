@@ -1,8 +1,21 @@
 # MCP Implementation Plan for RePORT India Clinical Study Data
 
-> **Document Type**: Implementation Plan | **Created**: December 8, 2025 | **Version**: 1.1  
+<!--
+Document Type: Explanation (Diátaxis)
+Target Audience: Project managers, architects, and developers
+Prerequisites: Understanding of MCP protocol and clinical data requirements
+-->
+
+> **Type**: Explanation | **Updated**: 2025-12-08 | **Status**: ✅ Active  
 > **Study**: RePORT India (Regional Prospective Observational Research for Tuberculosis)  
 > **Primary Regulation**: DPDPA 2023 (Digital Personal Data Protection Act) + DPDP Rules 2025
+
+**Related Documentation:**
+- [MCP Server Setup](MCP_SERVER_SETUP.md) — Server integration guide
+- [Data Pipeline](DATA_PIPELINE.md) — Data flow architecture
+- [Configuration Reference](CONFIGURATION.md) — Environment variables
+
+---
 
 ## Executive Summary
 
@@ -258,38 +271,14 @@ Priority: HIGH | Effort: Low | Dependencies: None
 - ✅ Docker support (Dockerfile present)
 - ✅ MCP SDK (`mcp[cli]>=1.0.0`)
 
-**Verification Script:**
+**Environment Verification:**
 
 ```bash
-# scripts/verify_environment.sh
-#!/bin/bash
-set -e
+# Verify environment with uv (handles all dependency checks)
+uv sync --all-extras
 
-echo "=== RePORTaLiN Environment Verification ==="
-
-# Check Python version
-python_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-echo "✓ Python: $python_version"
-
-# Check uv
-if command -v uv &> /dev/null; then
-    echo "✓ uv: $(uv --version)"
-else
-    echo "✗ uv not found. Install: curl -LsSf https://astral.sh/uv/install.sh | sh"
-    exit 1
-fi
-
-# Check Docker (optional)
-if command -v docker &> /dev/null; then
-    echo "✓ Docker: $(docker --version)"
-else
-    echo "⚠ Docker not found (optional for sandboxing)"
-fi
-
-# Verify MCP installation
-uv run python -c "import mcp; print(f'✓ MCP SDK: {mcp.__version__}')"
-
-echo "=== Environment Ready ==="
+# Verify MCP server is operational
+uv run python verify.py --verbose
 ```
 
 #### 2.2 Database Connection Setup

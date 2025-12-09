@@ -1,5 +1,20 @@
 # Data Pipeline Architecture
 
+<!--
+Document Type: Explanation (Diátaxis)
+Target Audience: Developers understanding the data flow
+Prerequisites: Basic understanding of data processing pipelines
+-->
+
+> **Type**: Explanation | **Updated**: 2025-12-08 | **Status**: ✅ Production Ready
+
+**Related Documentation:**
+- [MCP Server Setup](MCP_SERVER_SETUP.md) — Server integration guide
+- [Configuration Reference](CONFIGURATION.md) — Environment variables
+- [Testing Guide](TESTING_GUIDE.md) — Verification and testing
+
+---
+
 ## Overview
 
 The RePORTaLiN-Agent implements a complete data pipeline for querying RePORT India clinical study data:
