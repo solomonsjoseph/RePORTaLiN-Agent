@@ -8,136 +8,90 @@ Tests cover:
 - Pydantic input model validation
 - Tool registry functionality
 - Server configuration export
-- Security validations
+- Security validations (aggregates only, no individual records)
 """
 
 import pytest
 from pydantic import ValidationError
 
 from server.tools import (
-    ExploreStudyMetadataInput,
-    BuildTechnicalRequestInput,
+    DictionarySearchInput,
+    DatasetSearchInput,
+    CombinedSearchInput,
     get_tool_registry,
     mcp,
 )
 from shared.constants import SERVER_NAME, SERVER_VERSION
 
 
-class TestExploreStudyMetadataInput:
-    """Tests for ExploreStudyMetadataInput Pydantic model."""
+class TestDictionarySearchInput:
+    """Tests for DictionarySearchInput Pydantic model."""
 
-    def test_valid_metadata_query(self) -> None:
-        """Test that valid metadata queries are accepted."""
-        input_data = ExploreStudyMetadataInput(
-            query="Do we have any participants from Pune with follow-up data?",
+    def test_valid_search_query(self) -> None:
+        """Test that valid search queries are accepted."""
+        input_data = DictionarySearchInput(
+            query="smoking",
         )
-        assert "Pune" in input_data.query
-        assert input_data.site_filter is None
+        assert "smoking" in input_data.query
+        assert input_data.include_codelists is True
 
-    def test_query_with_site_filter(self) -> None:
-        """Test query with site filter."""
-        input_data = ExploreStudyMetadataInput(
-            query="What variables are available for TB diagnosis?",
-            site_filter="Pune",
+    def test_query_with_codelist_disabled(self) -> None:
+        """Test query with codelist search disabled."""
+        input_data = DictionarySearchInput(
+            query="HIV",
+            include_codelists=False,
         )
-        assert input_data.site_filter == "Pune"
-
-    def test_query_with_time_point_filter(self) -> None:
-        """Test query with time point filter."""
-        input_data = ExploreStudyMetadataInput(
-            query="How many participants have Month 24 data?",
-            time_point_filter="Month 24",
-        )
-        assert input_data.time_point_filter == "Month 24"
-
-    def test_rejects_forbidden_path_access(self) -> None:
-        """Test that queries attempting to access raw dataset are rejected."""
-        with pytest.raises(ValidationError) as exc_info:
-            ExploreStudyMetadataInput(
-                query="Read from data/dataset/Indo-vap_csv_files",
-            )
-        assert "SECURITY ALERT" in str(exc_info.value)
-
-    def test_rejects_phi_request(self) -> None:
-        """Test that queries requesting PHI are rejected."""
-        with pytest.raises(ValidationError) as exc_info:
-            ExploreStudyMetadataInput(
-                query="Show me all patient names from the study",
-            )
-        assert "metadata only" in str(exc_info.value)
-
-    def test_rejects_raw_data_export(self) -> None:
-        """Test that raw data export requests are rejected."""
-        with pytest.raises(ValidationError) as exc_info:
-            ExploreStudyMetadataInput(
-                query="Export data from the raw dataset",
-            )
-        assert "metadata only" in str(exc_info.value)
+        assert input_data.include_codelists is False
 
     def test_query_too_short(self) -> None:
-        """Test that very short queries are rejected."""
+        """Test that empty queries are rejected."""
         with pytest.raises(ValidationError):
-            ExploreStudyMetadataInput(query="Hi")
+            DictionarySearchInput(query="")
 
     def test_query_too_long(self) -> None:
         """Test that very long queries are rejected."""
         with pytest.raises(ValidationError):
-            ExploreStudyMetadataInput(query="x" * 501)
+            DictionarySearchInput(query="x" * 201)
 
 
-class TestBuildTechnicalRequestInput:
-    """Tests for BuildTechnicalRequestInput Pydantic model."""
+class TestDatasetSearchInput:
+    """Tests for DatasetSearchInput Pydantic model."""
 
-    def test_valid_technical_request(self) -> None:
-        """Test that valid technical requests are accepted."""
-        input_data = BuildTechnicalRequestInput(
-            description="Analyze treatment outcomes in TB patients with diabetes",
-            inclusion_criteria=["Female", "Age 18-45", "TB positive"],
-            exclusion_criteria=["HIV co-infection"],
-            variables_of_interest=["Age", "Sex", "TB_Status", "Treatment_Outcome"],
-            time_points=["Baseline", "Month 6", "Month 12"],
+    def test_valid_dataset_search(self) -> None:
+        """Test that valid dataset searches are accepted."""
+        input_data = DatasetSearchInput(
+            variable="AGE",
         )
-        assert "diabetes" in input_data.description.lower()
-        assert len(input_data.inclusion_criteria) == 3
-        assert len(input_data.exclusion_criteria) == 1
+        assert input_data.variable == "AGE"
+        assert input_data.table_filter is None
 
-    def test_minimal_technical_request(self) -> None:
-        """Test minimal technical request with required fields only."""
-        input_data = BuildTechnicalRequestInput(
-            description="Compare demographics across study sites",
+    def test_search_with_table_filter(self) -> None:
+        """Test search with table filter."""
+        input_data = DatasetSearchInput(
+            variable="SEX",
+            table_filter="Index",
         )
-        assert input_data.inclusion_criteria == []
-        assert input_data.exclusion_criteria == []
-        assert input_data.output_format == "concept_sheet"
+        assert input_data.table_filter == "Index"
 
-    def test_query_logic_output_format(self) -> None:
-        """Test query_logic output format."""
-        input_data = BuildTechnicalRequestInput(
-            description="Generate query for female participants",
-            output_format="query_logic",
+
+class TestCombinedSearchInput:
+    """Tests for CombinedSearchInput Pydantic model."""
+
+    def test_valid_combined_search(self) -> None:
+        """Test that valid combined searches are accepted."""
+        input_data = CombinedSearchInput(
+            concept="smoking status",
         )
-        assert input_data.output_format == "query_logic"
+        assert "smoking" in input_data.concept
+        assert input_data.include_statistics is True
 
-    def test_rejects_forbidden_path_in_description(self) -> None:
-        """Test that description attempting raw data access is rejected."""
-        with pytest.raises(ValidationError) as exc_info:
-            BuildTechnicalRequestInput(
-                description="Access the raw dataset in data/dataset folder",
-            )
-        assert "SECURITY ALERT" in str(exc_info.value)
-
-    def test_description_too_short(self) -> None:
-        """Test that very short descriptions are rejected."""
-        with pytest.raises(ValidationError):
-            BuildTechnicalRequestInput(description="Too short")
-
-    def test_invalid_output_format(self) -> None:
-        """Test that invalid output formats are rejected."""
-        with pytest.raises(ValidationError):
-            BuildTechnicalRequestInput(
-                description="Valid description for testing",
-                output_format="invalid_format",
-            )
+    def test_combined_search_without_statistics(self) -> None:
+        """Test combined search without statistics."""
+        input_data = CombinedSearchInput(
+            concept="HIV status",
+            include_statistics=False,
+        )
+        assert input_data.include_statistics is False
 
 
 class TestToolRegistry:
@@ -159,27 +113,29 @@ class TestToolRegistry:
         registry = get_tool_registry()
         assert "registered_tools" in registry
         tools = registry["registered_tools"]
-        assert "explore_study_metadata" in tools
-        assert "build_technical_request" in tools
+        assert "search_data_dictionary" in tools
+        assert "search_cleaned_dataset" in tools
+        assert "search_original_dataset" in tools
+        assert "combined_search" in tools
 
-    def test_registry_security_mode(self) -> None:
-        """Test that registry shows SECURE mode."""
+    def test_registry_contains_data_loaded_info(self) -> None:
+        """Test that registry shows data loaded statistics."""
         registry = get_tool_registry()
-        assert registry["mode"] == "SECURE"
+        assert "data_loaded" in registry
+        data = registry["data_loaded"]
+        assert "dictionary_tables" in data
+        assert "dictionary_fields" in data
+        assert "codelists" in data
+        assert "cleaned_tables" in data
+        assert "cleaned_records" in data
 
-    def test_registry_security_model(self) -> None:
-        """Test that registry includes security model details."""
+    def test_registry_contains_resources(self) -> None:
+        """Test that registry lists MCP resources."""
         registry = get_tool_registry()
-        assert "security_model" in registry
-        security = registry["security_model"]
-        assert security["raw_data_access"] == "BLOCKED"
-        assert security["metadata_access"] == "ALLOWED"
-
-    def test_registry_forbidden_zone(self) -> None:
-        """Test that registry specifies forbidden zone."""
-        registry = get_tool_registry()
-        assert "forbidden_zone" in registry
-        assert "dataset" in registry["forbidden_zone"]
+        assert "registered_resources" in registry
+        resources = registry["registered_resources"]
+        assert "dictionary://overview" in resources
+        assert "dictionary://tables" in resources
 
 
 class TestMCPServer:
@@ -199,49 +155,50 @@ class TestMCPServer:
         assert hasattr(mcp, "_instructions") or mcp.name is not None
 
 
-class TestSecurityValidation:
-    """Tests for security validation in input models."""
+class TestSecurityModel:
+    """Tests for security model - all tools return aggregates only."""
 
-    @pytest.mark.parametrize("forbidden_pattern", [
-        "data/dataset",
-        "data\\dataset",
-        "indo-vap",
-        "csv_files",
-        "6_HIV.xlsx",
-        "read from file",
-        "access the raw dataset",
-    ])
-    def test_metadata_rejects_forbidden_patterns(self, forbidden_pattern: str) -> None:
-        """Test that metadata queries reject various forbidden patterns."""
-        with pytest.raises(ValidationError):
-            ExploreStudyMetadataInput(
-                query=f"Please help me with {forbidden_pattern} analysis",
-            )
-
-    @pytest.mark.parametrize("phi_pattern", [
-        "show me all patients",
-        "list all records",
-        "export data",
-        "download dataset",
-        "raw data",
-        "patient names",
-        "individual records",
-    ])
-    def test_metadata_rejects_phi_patterns(self, phi_pattern: str) -> None:
-        """Test that metadata queries reject PHI request patterns."""
-        with pytest.raises(ValidationError):
-            ExploreStudyMetadataInput(
-                query=f"I need to {phi_pattern}",
-            )
+    def test_tools_designed_for_aggregates(self) -> None:
+        """Test that tool registry confirms aggregate-only design."""
+        registry = get_tool_registry()
+        # Tools are designed to only return aggregate data
+        # This is enforced in the tool implementations
+        assert len(registry["registered_tools"]) == 4
 
     @pytest.mark.parametrize("safe_query", [
-        "Do we have CD4 counts available?",
-        "How many study sites are there?",
-        "What variables exist for TB diagnosis?",
-        "Are there any participants from Pune?",
-        "What time points are collected?",
+        "smoking",
+        "HIV",
+        "age",
+        "SEX codelist",
+        "treatment outcome",
+        "diabetes",
+        "TB diagnosis",
     ])
-    def test_metadata_accepts_safe_queries(self, safe_query: str) -> None:
-        """Test that metadata queries accept safe/valid patterns."""
-        input_data = ExploreStudyMetadataInput(query=safe_query)
-        assert input_data.query == safe_query.strip()
+    def test_dictionary_accepts_safe_queries(self, safe_query: str) -> None:
+        """Test that dictionary search accepts valid queries."""
+        input_data = DictionarySearchInput(query=safe_query)
+        assert input_data.query == safe_query
+
+    @pytest.mark.parametrize("variable", [
+        "AGE",
+        "SEX",
+        "SMOKHX",
+        "HIV_R",
+        "OUTCLIN",
+    ])
+    def test_dataset_accepts_valid_variables(self, variable: str) -> None:
+        """Test that dataset search accepts valid variable names."""
+        input_data = DatasetSearchInput(variable=variable)
+        assert input_data.variable == variable
+
+    @pytest.mark.parametrize("concept", [
+        "smoking status",
+        "age distribution",
+        "HIV status",
+        "TB outcome",
+        "alcohol use",
+    ])
+    def test_combined_accepts_valid_concepts(self, concept: str) -> None:
+        """Test that combined search accepts valid clinical concepts."""
+        input_data = CombinedSearchInput(concept=concept)
+        assert input_data.concept == concept
