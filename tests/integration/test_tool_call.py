@@ -4,20 +4,21 @@ Test actual tool calls to verify the MCP server works end-to-end.
 This is an integration test that verifies complete MCP tool functionality.
 Run with: pytest tests/integration/ -m integration
 
-Tests cover all 4 implemented MCP tools:
-- query_database: SQL-like queries with validation
-- search_dictionary: Data dictionary search
-- fetch_metrics: Aggregate statistics with k-anonymity
-- health_check: Server status verification
+Tests cover the 2 implemented MCP tools:
+- explore_study_metadata: High-level feasibility queries
+- build_technical_request: Data extraction concept sheets
+
+Security constraints are enforced:
+- NO access to ./data/dataset/ (raw PHI)
+- ALL responses are de-identified
+- Zero-Trust output policy
 """
 
 import pytest
 
 from server.tools import (
-    FetchMetricsInput,
-    MetricType,
-    QueryDatabaseInput,
-    SearchDictionaryInput,
+    ExploreStudyMetadataInput,
+    BuildTechnicalRequestInput,
 )
 
 pytestmark = [
@@ -28,203 +29,254 @@ pytestmark = [
 
 
 # =============================================================================
-# query_database Tool Tests
+# explore_study_metadata Tool Tests
 # =============================================================================
 
-async def test_query_database_valid_select():
-    """Test query_database with a valid SELECT query."""
-    from server.tools import query_database
+async def test_explore_metadata_variable_check():
+    """Test explore_study_metadata for variable availability."""
+    from server.tools import explore_study_metadata
+    from mcp.server.fastmcp import Context
 
-    input_data = QueryDatabaseInput(
-        query="SELECT * FROM patients WHERE age > 18",
-        limit=10,
-        include_metadata=False,
+    input_data = ExploreStudyMetadataInput(
+        query="Do we have CD4 counts available in the study?",
     )
 
-    result = await query_database(input_data)
+    # Create a mock context
+    class MockContext:
+        async def info(self, msg: str) -> None:
+            pass
+    
+    result = await explore_study_metadata(input_data, MockContext())
 
     assert result["success"] is True
-    assert "data" in result
-    assert isinstance(result["data"], list)
-    assert result["row_count"] <= 10
-    assert "execution_time_ms" in result
+    assert "query_type" in result
+    assert "results" in result
+    assert result["data_available"] is True
 
 
-async def test_query_database_with_metadata():
-    """Test query_database with metadata included."""
-    from server.tools import query_database
-
-    input_data = QueryDatabaseInput(
-        query="SELECT id, name FROM patients LIMIT 5",
-        limit=5,
-        include_metadata=True,
+async def test_explore_metadata_site_query():
+    """Test explore_study_metadata for site information."""
+    from server.tools import explore_study_metadata
+    
+    input_data = ExploreStudyMetadataInput(
+        query="What study sites are available?",
+        site_filter="Pune",
     )
 
-    result = await query_database(input_data)
+    class MockContext:
+        async def info(self, msg: str) -> None:
+            pass
+    
+    result = await explore_study_metadata(input_data, MockContext())
 
     assert result["success"] is True
-    assert "metadata" in result
-    assert "columns" in result["metadata"]
+    assert result["query_type"] == "site_info"
+    assert "results" in result
 
 
-async def test_query_database_rejects_insert():
-    """Test that query_database rejects INSERT statements."""
-    with pytest.raises(ValueError, match="SELECT"):
-        QueryDatabaseInput(
-            query="INSERT INTO patients VALUES (1, 'test')",
-            limit=10,
+async def test_explore_metadata_enrollment_stats():
+    """Test explore_study_metadata for enrollment statistics."""
+    from server.tools import explore_study_metadata
+    
+    input_data = ExploreStudyMetadataInput(
+        query="How many participants are enrolled in the study?",
+    )
+
+    class MockContext:
+        async def info(self, msg: str) -> None:
+            pass
+    
+    result = await explore_study_metadata(input_data, MockContext())
+
+    assert result["success"] is True
+    assert result["query_type"] == "enrollment_stats"
+    assert "results" in result
+
+
+async def test_explore_metadata_time_points():
+    """Test explore_study_metadata for time point information."""
+    from server.tools import explore_study_metadata
+    
+    input_data = ExploreStudyMetadataInput(
+        query="What follow-up time points are collected?",
+        time_point_filter="Month 24",
+    )
+
+    class MockContext:
+        async def info(self, msg: str) -> None:
+            pass
+    
+    result = await explore_study_metadata(input_data, MockContext())
+
+    assert result["success"] is True
+    assert result["query_type"] == "time_point_info"
+
+
+async def test_explore_metadata_rejects_forbidden_access():
+    """Test that explore_study_metadata rejects forbidden path access."""
+    with pytest.raises(ValueError, match="SECURITY"):
+        ExploreStudyMetadataInput(
+            query="Read data from data/dataset/Indo-vap_csv_files",
         )
 
 
-async def test_query_database_rejects_drop():
-    """Test that query_database rejects DROP statements."""
-    with pytest.raises(ValueError, match="SELECT"):
-        QueryDatabaseInput(
-            query="DROP TABLE patients",
-            limit=10,
+async def test_explore_metadata_rejects_phi_request():
+    """Test that explore_study_metadata rejects PHI requests."""
+    with pytest.raises(ValueError, match="metadata only"):
+        ExploreStudyMetadataInput(
+            query="Show me all patient names in the database",
         )
 
 
 # =============================================================================
-# search_dictionary Tool Tests
+# build_technical_request Tool Tests
 # =============================================================================
 
-async def test_search_dictionary_basic():
-    """Test search_dictionary with basic search term."""
-    from server.tools import search_dictionary
-
-    input_data = SearchDictionaryInput(
-        search_term="patient",
-        include_values=True,
+async def test_build_request_concept_sheet():
+    """Test build_technical_request for concept sheet generation."""
+    from server.tools import build_technical_request
+    
+    input_data = BuildTechnicalRequestInput(
+        description="Analyze treatment outcomes in TB patients with diabetes",
+        inclusion_criteria=["Age 18-65", "Pulmonary TB", "Diabetes"],
+        exclusion_criteria=["HIV co-infection", "MDR-TB"],
+        variables_of_interest=["Age", "Sex", "Diabetes", "Treatment_Outcome"],
+        time_points=["Baseline", "Month 6", "Month 12"],
+        output_format="concept_sheet",
     )
 
-    result = await search_dictionary(input_data)
+    class MockContext:
+        async def info(self, msg: str) -> None:
+            pass
+    
+    result = await build_technical_request(input_data, MockContext())
 
     assert result["success"] is True
-    assert "matches" in result
-    assert len(result["matches"]) >= 1
-    assert result["search_term"] == "patient"
+    assert "request_id" in result
+    assert result["request_id"].startswith("REQ-")
+    assert "output" in result
+    assert result["output_format"] == "concept_sheet"
+    assert "variable_mapping" in result
+    assert "next_steps" in result
 
 
-async def test_search_dictionary_with_table_filter():
-    """Test search_dictionary with table filter."""
-    from server.tools import search_dictionary
-
-    input_data = SearchDictionaryInput(
-        search_term="diagnosis",
-        table_filter="clinical_data",
-        include_values=False,
+async def test_build_request_query_logic():
+    """Test build_technical_request for query logic generation."""
+    from server.tools import build_technical_request
+    
+    input_data = BuildTechnicalRequestInput(
+        description="Generate selection criteria for female participants",
+        inclusion_criteria=["Female", "Age 18-45"],
+        variables_of_interest=["Age", "Sex", "BMI"],
+        output_format="query_logic",
     )
 
-    result = await search_dictionary(input_data)
+    class MockContext:
+        async def info(self, msg: str) -> None:
+            pass
+    
+    result = await build_technical_request(input_data, MockContext())
 
     assert result["success"] is True
-    assert result["matches"][0]["table"] == "clinical_data"
+    assert result["output_format"] == "query_logic"
+    assert "output" in result
+    assert "query_logic" in result["output"]
+    assert "pseudocode" in result["output"]
 
 
-async def test_search_dictionary_sanitizes_input():
-    """Test that search_dictionary sanitizes potentially dangerous input."""
-    input_data = SearchDictionaryInput(
-        search_term="patient; DROP TABLE--",
+async def test_build_request_minimal():
+    """Test build_technical_request with minimal input."""
+    from server.tools import build_technical_request
+    
+    input_data = BuildTechnicalRequestInput(
+        description="Compare demographics across study sites",
     )
 
-    # Validator should strip dangerous characters
-    assert ";" not in input_data.search_term
-    assert "--" not in input_data.search_term
-
-
-# =============================================================================
-# fetch_metrics Tool Tests
-# =============================================================================
-
-async def test_fetch_metrics_count():
-    """Test fetch_metrics with COUNT metric type."""
-    from server.tools import fetch_metrics
-
-    input_data = FetchMetricsInput(
-        metric_type=MetricType.COUNT,
-        field_name="patients",
-    )
-
-    result = await fetch_metrics(input_data)
+    class MockContext:
+        async def info(self, msg: str) -> None:
+            pass
+    
+    result = await build_technical_request(input_data, MockContext())
 
     assert result["success"] is True
-    assert result["metric_type"] == "count"
-    assert result["field_name"] == "patients"
-    assert isinstance(result["result"], (int, float))
+    assert "request_id" in result
+    assert "output" in result
 
 
-async def test_fetch_metrics_average():
-    """Test fetch_metrics with AVERAGE metric type."""
-    from server.tools import fetch_metrics
-
-    input_data = FetchMetricsInput(
-        metric_type=MetricType.AVERAGE,
-        field_name="age",
+async def test_build_request_variable_mapping():
+    """Test that build_technical_request maps variables correctly."""
+    from server.tools import build_technical_request
+    
+    input_data = BuildTechnicalRequestInput(
+        description="Extract TB treatment outcome data",
+        variables_of_interest=["age", "sex", "hiv", "cd4"],
     )
 
-    result = await fetch_metrics(input_data)
+    class MockContext:
+        async def info(self, msg: str) -> None:
+            pass
+    
+    result = await build_technical_request(input_data, MockContext())
 
     assert result["success"] is True
-    assert result["metric_type"] == "average"
-    assert isinstance(result["result"], (int, float))
+    assert "variable_mapping" in result
+    # Should have mapped at least some variables
+    mapping = result["variable_mapping"]
+    assert len(mapping) > 0
 
 
-async def test_fetch_metrics_with_groupby():
-    """Test fetch_metrics with group_by field."""
-    from server.tools import fetch_metrics
-
-    input_data = FetchMetricsInput(
-        metric_type=MetricType.DISTRIBUTION,
-        field_name="age",
-        group_by="age_range",
-    )
-
-    result = await fetch_metrics(input_data)
-
-    assert result["success"] is True
-    assert result["group_by"] == "age_range"
-
-
-async def test_fetch_metrics_with_filters():
-    """Test fetch_metrics with filter conditions."""
-    from server.tools import fetch_metrics
-
-    input_data = FetchMetricsInput(
-        metric_type=MetricType.SUM,
-        field_name="visit_count",
-        filters={"status": "active", "age_min": 18},
-    )
-
-    result = await fetch_metrics(input_data)
-
-    assert result["success"] is True
-    assert result["filters_applied"] is True
+async def test_build_request_rejects_forbidden_access():
+    """Test that build_technical_request rejects forbidden path access."""
+    with pytest.raises(ValueError, match="SECURITY"):
+        BuildTechnicalRequestInput(
+            description="Access the raw dataset in data/dataset folder",
+        )
 
 
 # =============================================================================
-# health_check Tool Tests
+# Security Integration Tests
 # =============================================================================
 
-async def test_health_check():
-    """Test health_check returns proper status."""
-    from server.tools import health_check
+async def test_output_sanitization():
+    """Test that outputs are properly sanitized."""
+    from server.tools import explore_study_metadata
+    
+    input_data = ExploreStudyMetadataInput(
+        query="What data domains are available in the study?",
+    )
 
-    result = await health_check()
+    class MockContext:
+        async def info(self, msg: str) -> None:
+            pass
+    
+    result = await explore_study_metadata(input_data, MockContext())
 
-    assert result["status"] == "healthy"
-    assert "version" in result
-    assert "protocol_version" in result
-    assert "capabilities" in result
-    assert result["capabilities"]["tools"] is True
+    assert result["success"] is True
+    
+    # Verify no sensitive fields in output
+    result_str = str(result).lower()
+    sensitive_terms = ["ssn", "aadhaar", "phone", "email", "address"]
+    for term in sensitive_terms:
+        # If present, should be REDACTED
+        if term in result_str:
+            assert "redacted" in result_str
 
 
-async def test_health_check_includes_privacy_settings():
-    """Test health_check includes privacy configuration."""
-    from server.tools import health_check
+async def test_no_raw_phi_in_responses():
+    """Test that no raw PHI appears in any response."""
+    from server.tools import explore_study_metadata
+    
+    input_data = ExploreStudyMetadataInput(
+        query="What is the feasibility of studying TB outcomes?",
+    )
 
-    result = await health_check()
+    class MockContext:
+        async def info(self, msg: str) -> None:
+            pass
+    
+    result = await explore_study_metadata(input_data, MockContext())
 
-    assert "privacy" in result
-    assert "k_anonymity_threshold" in result["privacy"]
-    assert result["privacy"]["k_anonymity_threshold"] >= 1
+    assert result["success"] is True
+    assert "note" in result
+    # Should mention de-identified or no patient-level data
+    assert "patient-level" in result["note"].lower() or "de-identified" in result["source"].lower()

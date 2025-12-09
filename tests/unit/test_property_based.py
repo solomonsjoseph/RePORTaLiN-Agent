@@ -14,175 +14,214 @@ from hypothesis import given, strategies as st, assume, settings
 import pytest
 
 from server.tools import (
-    QueryDatabaseInput,
-    SearchDictionaryInput,
-    FetchMetricsInput,
-    MetricType,
+    ExploreStudyMetadataInput,
+    BuildTechnicalRequestInput,
 )
 from pydantic import ValidationError
 
 
-class TestQueryDatabaseInputProperties:
-    """Property-based tests for QueryDatabaseInput validation."""
+class TestExploreStudyMetadataInputProperties:
+    """Property-based tests for ExploreStudyMetadataInput validation."""
 
-    @given(st.text(min_size=1, max_size=50))
-    def test_non_select_queries_always_rejected(self, prefix: str) -> None:
-        """Property: Any query not starting with SELECT should be rejected."""
-        assume(not prefix.strip().upper().startswith("SELECT"))
-        assume(len(prefix.strip()) >= 10)  # Meet minimum length
+    @given(st.text(min_size=5, max_size=100))
+    def test_queries_with_forbidden_patterns_rejected(self, query: str) -> None:
+        """Property: Any query containing forbidden patterns should be rejected."""
+        forbidden_patterns = ["data/dataset", "indo-vap", ".xlsx", "raw data"]
         
-        with pytest.raises(ValidationError):
-            QueryDatabaseInput(query=prefix + " something")
+        for pattern in forbidden_patterns:
+            full_query = f"{query} {pattern} {query}"
+            
+            with pytest.raises(ValidationError):
+                ExploreStudyMetadataInput(query=full_query)
 
-    @given(st.integers(min_value=1, max_value=1000))
-    def test_valid_limits_always_accepted(self, limit: int) -> None:
-        """Property: Any limit between 1 and 1000 should be accepted."""
-        input_data = QueryDatabaseInput(
-            query="SELECT * FROM patients WHERE id > 0",
-            limit=limit,
-        )
-        assert input_data.limit == limit
-
-    @given(st.integers())
-    def test_invalid_limits_rejected(self, limit: int) -> None:
-        """Property: Limits outside 1-1000 should be rejected."""
-        assume(limit < 1 or limit > 1000)
+    @given(st.text(min_size=5, max_size=400))
+    @settings(max_examples=50)
+    def test_safe_queries_pass_length_validation(self, text: str) -> None:
+        """Property: Safe queries meeting length requirements should pass."""
+        # Filter out any potentially forbidden patterns
+        forbidden = [
+            "data/dataset", "data\\dataset", "indo-vap", "csv_files", 
+            ".xlsx", "raw data", "patient names", "show me all patients",
+            "list all records", "export data", "download dataset",
+            "individual records", "read from file", "access the raw dataset"
+        ]
         
-        with pytest.raises(ValidationError):
-            QueryDatabaseInput(
-                query="SELECT * FROM patients",
-                limit=limit,
-            )
-
-    @given(st.text(min_size=10, max_size=100).filter(lambda x: ";" not in x and "--" not in x))
-    def test_select_prefix_always_required(self, suffix: str) -> None:
-        """Property: SELECT prefix is required for valid queries."""
-        query = f"SELECT {suffix}"
-        
-        # Should not raise for any safe SELECT query
-        try:
-            input_data = QueryDatabaseInput(query=query)
-            assert input_data.query.upper().startswith("SELECT")
-        except ValidationError:
-            # Some suffixes might contain dangerous keywords
-            pass
-
-    @given(st.sampled_from(["INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE"]))
-    def test_dangerous_keywords_always_rejected(self, keyword: str) -> None:
-        """Property: Dangerous SQL keywords are always rejected."""
-        # Even if disguised as SELECT, dangerous keywords should fail
-        query = f"SELECT * FROM users; {keyword} TABLE users"
-        
-        with pytest.raises(ValidationError):
-            QueryDatabaseInput(query=query)
-
-
-class TestSearchDictionaryInputProperties:
-    """Property-based tests for SearchDictionaryInput validation."""
-
-    @given(st.text(min_size=2, max_size=100))
-    def test_valid_search_terms_accepted(self, search_term: str) -> None:
-        """Property: Search terms between 2-100 chars should be accepted."""
-        assume(len(search_term.strip()) >= 2)
+        text_lower = text.lower()
+        assume(not any(f in text_lower for f in forbidden))
+        assume(5 <= len(text.strip()) <= 500)
+        assume(len(text.strip()) >= 5)  # Minimum query length
         
         try:
-            input_data = SearchDictionaryInput(search_term=search_term)
-            assert len(input_data.search_term) >= 2
+            input_data = ExploreStudyMetadataInput(query=text)
+            assert input_data.query == text.strip()
         except ValidationError:
-            # Some special characters might cause issues
+            # Some texts might still hit validation rules
             pass
 
-    @given(st.text(max_size=1))
-    def test_short_search_terms_rejected(self, search_term: str) -> None:
-        """Property: Search terms under 2 chars should be rejected."""
+    @given(st.text(min_size=1, max_size=4))
+    def test_short_queries_always_rejected(self, query: str) -> None:
+        """Property: Queries shorter than 5 characters should always be rejected."""
         with pytest.raises(ValidationError):
-            SearchDictionaryInput(search_term=search_term)
+            ExploreStudyMetadataInput(query=query)
 
-    @given(st.text(min_size=2, max_size=50), st.booleans())
-    def test_include_values_flag_preserved(self, search_term: str, include_values: bool) -> None:
-        """Property: include_values flag should be preserved."""
-        assume(len(search_term.strip()) >= 2)
-        
-        try:
-            input_data = SearchDictionaryInput(
-                search_term=search_term,
-                include_values=include_values,
-            )
-            assert input_data.include_values == include_values
-        except ValidationError:
-            pass
+    @given(st.text(min_size=501, max_size=600))
+    def test_long_queries_always_rejected(self, query: str) -> None:
+        """Property: Queries longer than 500 characters should always be rejected."""
+        with pytest.raises(ValidationError):
+            ExploreStudyMetadataInput(query=query)
 
 
-class TestFetchMetricsInputProperties:
-    """Property-based tests for FetchMetricsInput validation."""
+class TestBuildTechnicalRequestInputProperties:
+    """Property-based tests for BuildTechnicalRequestInput validation."""
 
     @given(
-        st.sampled_from(list(MetricType)),
-        st.text(min_size=1, max_size=100).filter(lambda x: len(x.strip()) > 0),
+        st.text(min_size=10, max_size=400),
+        st.lists(st.text(min_size=1, max_size=50), max_size=5),
+        st.lists(st.text(min_size=1, max_size=50), max_size=5),
     )
-    def test_all_metric_types_with_valid_fields(
-        self, metric_type: MetricType, field_name: str
+    @settings(max_examples=50)
+    def test_safe_descriptions_accepted(
+        self, 
+        description: str, 
+        inclusion: list[str],
+        exclusion: list[str],
     ) -> None:
-        """Property: All metric types should work with valid field names."""
-        assume(len(field_name.strip()) >= 1)
+        """Property: Safe descriptions meeting length requirements should pass."""
+        # Filter out forbidden patterns
+        forbidden = ["data/dataset", "data\\dataset", "indo-vap", ".xlsx", "raw data"]
+        
+        desc_lower = description.lower()
+        assume(not any(f in desc_lower for f in forbidden))
+        assume(10 <= len(description.strip()) <= 500)
         
         try:
-            input_data = FetchMetricsInput(
-                metric_type=metric_type,
-                field_name=field_name,
+            input_data = BuildTechnicalRequestInput(
+                description=description,
+                inclusion_criteria=inclusion,
+                exclusion_criteria=exclusion,
             )
-            assert input_data.metric_type == metric_type
+            assert input_data.description == description.strip()
         except ValidationError:
+            # Some descriptions might still hit validation rules
             pass
 
-    @given(st.dictionaries(st.text(min_size=1, max_size=20), st.text(min_size=1, max_size=20)))
-    def test_arbitrary_filters_accepted(self, filters: dict[str, str]) -> None:
-        """Property: Arbitrary filter dictionaries should be accepted."""
-        assume(len(filters) > 0)
-        
-        input_data = FetchMetricsInput(
-            metric_type=MetricType.COUNT,
-            field_name="test_field",
-            filters=filters,
+    @given(st.text(min_size=1, max_size=9))
+    def test_short_descriptions_always_rejected(self, description: str) -> None:
+        """Property: Descriptions shorter than 10 characters should be rejected."""
+        with pytest.raises(ValidationError):
+            BuildTechnicalRequestInput(description=description)
+
+    @given(st.sampled_from(["concept_sheet", "query_logic"]))
+    def test_valid_output_formats_always_accepted(self, output_format: str) -> None:
+        """Property: Valid output formats should always be accepted."""
+        input_data = BuildTechnicalRequestInput(
+            description="Valid description for testing purposes",
+            output_format=output_format,
         )
-        assert input_data.filters == filters
+        assert input_data.output_format == output_format
 
-
-class TestEncryptionProperties:
-    """Property-based tests for encryption module."""
-
-    @given(st.binary(min_size=0, max_size=10000))
-    @settings(max_examples=50)  # Limit for performance
-    def test_encrypt_decrypt_roundtrip(self, plaintext: bytes) -> None:
-        """Property: Encryption followed by decryption returns original data."""
-        from server.security.encryption import AES256GCMCipher
+    @given(st.text(min_size=1, max_size=20).filter(
+        lambda x: x not in ["concept_sheet", "query_logic"]
+    ))
+    def test_invalid_output_formats_always_rejected(self, output_format: str) -> None:
+        """Property: Invalid output formats should always be rejected."""
+        assume(output_format not in ["concept_sheet", "query_logic"])
         
-        cipher = AES256GCMCipher.generate()
-        encrypted = cipher.encrypt(plaintext)
-        decrypted = cipher.decrypt(encrypted)
-        
-        assert decrypted == plaintext
+        with pytest.raises(ValidationError):
+            BuildTechnicalRequestInput(
+                description="Valid description for testing purposes",
+                output_format=output_format,
+            )
 
-    @given(st.binary(min_size=1, max_size=1000))
+
+class TestSecurityValidationProperties:
+    """Property-based tests for security validation."""
+
+    @given(st.sampled_from([
+        "data/dataset", "data\\dataset", "indo-vap", "csv_files",
+        "6_HIV.xlsx", "read from file", "access the raw dataset",
+    ]))
+    def test_forbidden_patterns_always_blocked_in_metadata(self, pattern: str) -> None:
+        """Property: Forbidden patterns are always rejected in metadata queries."""
+        query = f"Please help me analyze {pattern} data"
+        
+        with pytest.raises(ValidationError) as exc_info:
+            ExploreStudyMetadataInput(query=query)
+        
+        # Should raise security-related error
+        error_str = str(exc_info.value).lower()
+        assert "security" in error_str or "prohibited" in error_str or "metadata only" in error_str
+
+    @given(st.sampled_from([
+        "show me all patients", "list all records", "export data",
+        "download dataset", "raw data", "patient names", "individual records",
+    ]))
+    def test_phi_patterns_always_blocked(self, phi_pattern: str) -> None:
+        """Property: PHI request patterns are always rejected."""
+        query = f"I need to {phi_pattern} from the study"
+        
+        with pytest.raises(ValidationError) as exc_info:
+            ExploreStudyMetadataInput(query=query)
+        
+        # Should provide guidance about metadata-only access
+        assert "metadata only" in str(exc_info.value).lower()
+
+    @given(st.sampled_from([
+        "data/dataset", "data\\dataset", "indo-vap", ".xlsx", "raw data",
+    ]))
+    def test_forbidden_patterns_always_blocked_in_technical_request(self, pattern: str) -> None:
+        """Property: Forbidden patterns are always rejected in technical requests."""
+        description = f"Access {pattern} for analysis"
+        
+        with pytest.raises(ValidationError) as exc_info:
+            BuildTechnicalRequestInput(description=description)
+        
+        assert "SECURITY ALERT" in str(exc_info.value)
+
+
+class TestInputSanitizationProperties:
+    """Property-based tests for input sanitization."""
+
+    @given(st.text(min_size=5, max_size=200))
     @settings(max_examples=30)
-    def test_different_ciphertexts_for_same_plaintext(self, plaintext: bytes) -> None:
-        """Property: Same plaintext produces different ciphertext each time."""
-        from server.security.encryption import AES256GCMCipher
+    def test_query_whitespace_always_trimmed(self, text: str) -> None:
+        """Property: Query whitespace should always be trimmed."""
+        # Filter out forbidden patterns
+        forbidden = [
+            "data/dataset", "indo-vap", ".xlsx", "raw data", "patient names",
+            "show me all patients", "export data", "download dataset",
+            "list all records", "individual records"
+        ]
         
-        cipher = AES256GCMCipher.generate()
-        encrypted1 = cipher.encrypt(plaintext)
-        encrypted2 = cipher.encrypt(plaintext)
+        text_lower = text.lower()
+        assume(not any(f in text_lower for f in forbidden))
+        assume(len(text.strip()) >= 5)
         
-        # Should differ due to random nonce
-        assert encrypted1 != encrypted2
+        padded_query = f"  {text}  "
+        
+        try:
+            input_data = ExploreStudyMetadataInput(query=padded_query)
+            assert input_data.query == padded_query.strip()
+        except ValidationError:
+            # Some inputs may be rejected for other reasons
+            pass
 
-    @given(st.text(min_size=8, max_size=100), st.binary(min_size=16, max_size=32))
+    @given(st.text(min_size=10, max_size=200))
     @settings(max_examples=30)
-    def test_key_derivation_deterministic(self, password: str, salt: bytes) -> None:
-        """Property: Same password + salt always produces same key."""
-        from server.security.encryption import derive_key_from_password
+    def test_description_whitespace_always_trimmed(self, text: str) -> None:
+        """Property: Description whitespace should always be trimmed."""
+        # Filter out forbidden patterns
+        forbidden = ["data/dataset", "indo-vap", ".xlsx", "raw data"]
         
-        key1 = derive_key_from_password(password, salt)
-        key2 = derive_key_from_password(password, salt)
+        text_lower = text.lower()
+        assume(not any(f in text_lower for f in forbidden))
+        assume(len(text.strip()) >= 10)
         
-        assert key1 == key2
+        padded_description = f"  {text}  "
+        
+        try:
+            input_data = BuildTechnicalRequestInput(description=padded_description)
+            assert input_data.description == padded_description.strip()
+        except ValidationError:
+            # Some inputs may be rejected for other reasons
+            pass

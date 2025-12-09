@@ -1,0 +1,112 @@
+{
+  "study_name": "RePORT India (Indo-VAP)",
+  "study_full_name": "Regional Prospective Observational Research for Tuberculosis - India",
+  "study_description": "Multi-center observational cohort study investigating tuberculosis outcomes, risk factors, and treatment responses in India",
+  "study_type": "Prospective Observational Cohort",
+  "disease_focus": "Tuberculosis (TB)",
+  "country": "India",
+  "sites": [
+    {"id": "SITE01", "name": "Pune", "region": "Maharashtra"},
+    {"id": "SITE02", "name": "Chennai", "region": "Tamil Nadu"},
+    {"id": "SITE03", "name": "Delhi", "region": "National Capital Region"}
+  ],
+  "cohorts": {
+    "A": {
+      "name": "TB Index Cases",
+      "description": "Patients newly diagnosed with tuberculosis",
+      "enrollment_target": "500-700",
+      "key_outcomes": ["Treatment outcome", "TB recurrence", "Mortality"]
+    },
+    "B": {
+      "name": "Household Contacts (HHC)",
+      "description": "People living in close contact with TB index cases",
+      "enrollment_target": "1000-1500",
+      "key_outcomes": ["Incident TB", "TST/IGRA conversion", "TB infection"]
+    }
+  },
+  "enrollment": {
+    "total_target": "1500-2200",
+    "status": "Completed",
+    "enrollment_period": "2014-2019"
+  },
+  "follow_up": {
+    "duration_months": 24,
+    "visit_schedule": [
+      {"name": "Screening", "window": "Day -14 to 0"},
+      {"name": "Baseline/Enrollment", "window": "Day 0"},
+      {"name": "Month 2", "window": "Week 8 ± 2 weeks"},
+      {"name": "Month 6", "window": "Month 6 ± 1 month"},
+      {"name": "Month 12", "window": "Month 12 ± 1 month"},
+      {"name": "Month 18", "window": "Month 18 ± 1 month"},
+      {"name": "Month 24", "window": "Month 24 ± 1 month"},
+      {"name": "End of Study/Early Termination", "window": "As applicable"}
+    ]
+  },
+  "domains": {
+    "demographics": {
+      "description": "Patient demographics and enrollment information",
+      "variables": ["Age", "Sex", "Site", "Education", "Occupation", "Marital Status", "Income"],
+      "forms": ["2A_ICBaseline", "2B_HCBaseline"]
+    },
+    "laboratory": {
+      "description": "Laboratory tests including TB diagnostics",
+      "variables": ["CD4 Count", "HIV Status", "Smear Microscopy", "TB Culture", "Drug Susceptibility Testing", "CBC", "IGRA", "TST", "HbA1c", "Blood Glucose"],
+      "forms": ["4_Smear", "5_CBC", "6_HIV", "7_Culture", "10_TST", "11_IGRA", "21_DSTIsolate"]
+    },
+    "clinical": {
+      "description": "Clinical assessments and TB characteristics",
+      "variables": ["TB Status", "TB Type", "Cavitary Disease", "Disease Severity", "Chest X-ray Findings", "Symptoms", "Physical Examination"],
+      "forms": ["8_CXR", "9_EEval", "1A_ICScreening"]
+    },
+    "comorbidities": {
+      "description": "Chronic conditions and comorbidities",
+      "variables": ["Diabetes Status", "HIV Status", "Malnutrition", "Anemia", "Chronic Kidney Disease"],
+      "forms": ["2A_ICBaseline", "6_HIV"]
+    },
+    "lifestyle": {
+      "description": "Behavioral and lifestyle factors",
+      "variables": ["Smoking Status", "Alcohol Use", "Tobacco Use", "Substance Use"],
+      "forms": ["2A_ICBaseline", "53_exposure"]
+    },
+    "treatment": {
+      "description": "TB treatment information",
+      "variables": ["Treatment Regimen", "Treatment Start Date", "Treatment Compliance", "Concomitant Medications"],
+      "forms": ["13_TxCompliance", "18_1_TargConcom", "18_2_TargConcom"]
+    },
+    "outcomes": {
+      "description": "Treatment and study outcomes",
+      "variables": ["Treatment Outcome", "TB Recurrence", "Mortality", "Loss to Follow-up", "Transfer Out"],
+      "forms": ["98A_FOA", "98B_FOB", "99A_FSA", "99B_FSB"]
+    },
+    "follow_up": {
+      "description": "Follow-up visit data",
+      "variables": ["Visit Date", "Visit Status", "Adverse Events", "Serious Adverse Events"],
+      "forms": ["12A_FUA", "12B_FUB", "95_SAE"]
+    }
+  },
+  "forms_inventory": {
+    "total_forms": 41,
+    "categories": {
+      "screening": ["1A_ICScreening", "1B_HCScreening"],
+      "baseline": ["2A_ICBaseline", "2A_ICBaseline_1", "2B_HCBaseline"],
+      "laboratory": ["3_Specimen_Collection", "4_Smear", "5_CBC", "6_HIV", "7_Culture", "10_TST", "11_IGRA", "19_Smear", "21_DSTISO", "21_DSTIsolate"],
+      "imaging": ["8_CXR"],
+      "clinical_evaluation": ["9_EEval", "17_EligConfirmation"],
+      "follow_up": ["12A_FUA", "12B_FUB", "98A_FOA", "98B_FOB", "99A_FSA", "99B_FSB"],
+      "treatment": ["13_TxCompliance", "18_1_TargConcom", "18_2_TargConcom"],
+      "case_classification": ["14_CaseControl", "14_Case_Control", "20_CoEnroll"],
+      "additional_testing": ["15_Feces", "16_Helminth", "53_exposure", "30_Air_Quality"],
+      "safety": ["95_SAE"],
+      "specimen_tracking": ["95_Specimen_Tracking", "96_Specimen_Tracking", "97_Not_Collected"],
+      "administrative": ["18_NonConsent", "101_HHC_Recontact", "101_HHC_Recontact_1"]
+    }
+  },
+  "privacy_compliance": {
+    "level": "De-identified",
+    "standards": ["DPDPA 2023", "ICMR Ethical Guidelines", "ICH-GCP"],
+    "k_anonymity": true,
+    "data_access": "Controlled access via data governance committee"
+  },
+  "data_dictionary_available": true,
+  "last_updated": "2024-12-01"
+}

@@ -53,6 +53,16 @@ from client.agent import (
     MCPAgent,
     run_agent,
 )
+from client.react_rag_agent import (
+    AgentState,
+    LLMProvider,
+    MCPToolAdapter,
+    QueryType,
+    ReActConfig,
+    ReActRAGAgent,
+    ToolResult,
+    run_react_agent,
+)
 from client.mcp_client import (
     AnthropicTool,
     MCPAuthenticationError,
@@ -72,10 +82,13 @@ __all__ = [
     "AgentConfigError",
     "AgentError",
     "AgentExecutionError",
+    "AgentState",
     "AnthropicTool",
     # Agent classes
+    "LLMProvider",
     "MCPAgent",
     "MCPAuthenticationError",
+    "MCPToolAdapter",
     # Exception classes
     "MCPClientError",
     "MCPConnectionError",
@@ -84,9 +97,14 @@ __all__ = [
     "MCPToolExecutionError",
     # Type definitions
     "OpenAITool",
+    "QueryType",
+    "ReActConfig",
+    "ReActRAGAgent",
+    "ToolResult",
     # Main client class
     "UniversalMCPClient",
     # Convenience functions
     "create_client",
     "run_agent",
+    "run_react_agent",
 ]

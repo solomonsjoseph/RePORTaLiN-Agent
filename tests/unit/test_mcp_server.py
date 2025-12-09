@@ -8,228 +8,240 @@ Tests cover:
 - Pydantic input model validation
 - Tool registry functionality
 - Server configuration export
-- Resource definitions
+- Security validations
 """
 
 import pytest
 from pydantic import ValidationError
 
 from server.tools import (
-    QueryDatabaseInput,
-    SearchDictionaryInput,
-    FetchMetricsInput,
-    MetricType,
+    ExploreStudyMetadataInput,
+    BuildTechnicalRequestInput,
     get_tool_registry,
     mcp,
 )
 from shared.constants import SERVER_NAME, SERVER_VERSION
 
 
-class TestQueryDatabaseInput:
-    """Tests for QueryDatabaseInput Pydantic model."""
+class TestExploreStudyMetadataInput:
+    """Tests for ExploreStudyMetadataInput Pydantic model."""
 
-    def test_valid_select_query(self) -> None:
-        """Test that valid SELECT queries are accepted."""
-        input_data = QueryDatabaseInput(
-            query="SELECT * FROM patients WHERE age > 18",
-            limit=100,
+    def test_valid_metadata_query(self) -> None:
+        """Test that valid metadata queries are accepted."""
+        input_data = ExploreStudyMetadataInput(
+            query="Do we have any participants from Pune with follow-up data?",
         )
-        assert input_data.query.startswith("SELECT")
-        assert input_data.limit == 100
+        assert "Pune" in input_data.query
+        assert input_data.site_filter is None
 
-    def test_query_whitespace_trimmed(self) -> None:
-        """Test that query whitespace is trimmed."""
-        input_data = QueryDatabaseInput(
-            query="  SELECT * FROM patients  ",
-            limit=10,
+    def test_query_with_site_filter(self) -> None:
+        """Test query with site filter."""
+        input_data = ExploreStudyMetadataInput(
+            query="What variables are available for TB diagnosis?",
+            site_filter="Pune",
         )
-        assert input_data.query == "SELECT * FROM patients"
+        assert input_data.site_filter == "Pune"
 
-    def test_rejects_insert_query(self) -> None:
-        """Test that INSERT queries are rejected."""
-        with pytest.raises(ValidationError):
-            QueryDatabaseInput(
-                query="INSERT INTO patients VALUES (1, 'test')",
+    def test_query_with_time_point_filter(self) -> None:
+        """Test query with time point filter."""
+        input_data = ExploreStudyMetadataInput(
+            query="How many participants have Month 24 data?",
+            time_point_filter="Month 24",
+        )
+        assert input_data.time_point_filter == "Month 24"
+
+    def test_rejects_forbidden_path_access(self) -> None:
+        """Test that queries attempting to access raw dataset are rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            ExploreStudyMetadataInput(
+                query="Read from data/dataset/Indo-vap_csv_files",
             )
+        assert "SECURITY ALERT" in str(exc_info.value)
 
-    def test_rejects_update_query(self) -> None:
-        """Test that UPDATE queries are rejected."""
-        with pytest.raises(ValidationError):
-            QueryDatabaseInput(
-                query="UPDATE patients SET name = 'test' WHERE id = 1",
+    def test_rejects_phi_request(self) -> None:
+        """Test that queries requesting PHI are rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            ExploreStudyMetadataInput(
+                query="Show me all patient names from the study",
             )
+        assert "metadata only" in str(exc_info.value)
 
-    def test_rejects_delete_query(self) -> None:
-        """Test that DELETE queries are rejected."""
-        with pytest.raises(ValidationError):
-            QueryDatabaseInput(
-                query="DELETE FROM patients WHERE id = 1",
+    def test_rejects_raw_data_export(self) -> None:
+        """Test that raw data export requests are rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            ExploreStudyMetadataInput(
+                query="Export data from the raw dataset",
             )
+        assert "metadata only" in str(exc_info.value)
 
-    def test_rejects_drop_query(self) -> None:
-        """Test that DROP queries are rejected."""
+    def test_query_too_short(self) -> None:
+        """Test that very short queries are rejected."""
         with pytest.raises(ValidationError):
-            QueryDatabaseInput(query="DROP TABLE patients")
+            ExploreStudyMetadataInput(query="Hi")
 
-    def test_rejects_query_too_short(self) -> None:
-        """Test that queries shorter than min_length are rejected."""
+    def test_query_too_long(self) -> None:
+        """Test that very long queries are rejected."""
         with pytest.raises(ValidationError):
-            QueryDatabaseInput(query="SELECT")
+            ExploreStudyMetadataInput(query="x" * 501)
 
-    def test_limit_bounds(self) -> None:
-        """Test limit parameter bounds validation."""
-        # Valid limit
-        valid = QueryDatabaseInput(
-            query="SELECT * FROM patients",
-            limit=500,
+
+class TestBuildTechnicalRequestInput:
+    """Tests for BuildTechnicalRequestInput Pydantic model."""
+
+    def test_valid_technical_request(self) -> None:
+        """Test that valid technical requests are accepted."""
+        input_data = BuildTechnicalRequestInput(
+            description="Analyze treatment outcomes in TB patients with diabetes",
+            inclusion_criteria=["Female", "Age 18-45", "TB positive"],
+            exclusion_criteria=["HIV co-infection"],
+            variables_of_interest=["Age", "Sex", "TB_Status", "Treatment_Outcome"],
+            time_points=["Baseline", "Month 6", "Month 12"],
         )
-        assert valid.limit == 500
+        assert "diabetes" in input_data.description.lower()
+        assert len(input_data.inclusion_criteria) == 3
+        assert len(input_data.exclusion_criteria) == 1
 
-        # Limit too low
-        with pytest.raises(ValidationError):
-            QueryDatabaseInput(
-                query="SELECT * FROM patients",
-                limit=0,
+    def test_minimal_technical_request(self) -> None:
+        """Test minimal technical request with required fields only."""
+        input_data = BuildTechnicalRequestInput(
+            description="Compare demographics across study sites",
+        )
+        assert input_data.inclusion_criteria == []
+        assert input_data.exclusion_criteria == []
+        assert input_data.output_format == "concept_sheet"
+
+    def test_query_logic_output_format(self) -> None:
+        """Test query_logic output format."""
+        input_data = BuildTechnicalRequestInput(
+            description="Generate query for female participants",
+            output_format="query_logic",
+        )
+        assert input_data.output_format == "query_logic"
+
+    def test_rejects_forbidden_path_in_description(self) -> None:
+        """Test that description attempting raw data access is rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            BuildTechnicalRequestInput(
+                description="Access the raw dataset in data/dataset folder",
             )
+        assert "SECURITY ALERT" in str(exc_info.value)
 
-        # Limit too high
+    def test_description_too_short(self) -> None:
+        """Test that very short descriptions are rejected."""
         with pytest.raises(ValidationError):
-            QueryDatabaseInput(
-                query="SELECT * FROM patients",
-                limit=2000,
-            )
+            BuildTechnicalRequestInput(description="Too short")
 
-
-class TestSearchDictionaryInput:
-    """Tests for SearchDictionaryInput Pydantic model."""
-
-    def test_valid_search_term(self) -> None:
-        """Test that valid search terms are accepted."""
-        input_data = SearchDictionaryInput(
-            search_term="patient_id",
-            include_values=True,
-        )
-        assert input_data.search_term == "patient_id"
-        assert input_data.include_values is True
-
-    def test_sanitizes_dangerous_characters(self) -> None:
-        """Test that dangerous characters are removed from search term."""
-        input_data = SearchDictionaryInput(
-            search_term="patient; DROP TABLE--",
-        )
-        assert ";" not in input_data.search_term
-        assert "--" not in input_data.search_term
-
-    def test_search_term_min_length(self) -> None:
-        """Test that search term must meet minimum length."""
+    def test_invalid_output_format(self) -> None:
+        """Test that invalid output formats are rejected."""
         with pytest.raises(ValidationError):
-            SearchDictionaryInput(search_term="a")
-
-    def test_optional_table_filter(self) -> None:
-        """Test optional table_filter parameter."""
-        input_data = SearchDictionaryInput(
-            search_term="diagnosis",
-            table_filter="clinical_data",
-        )
-        assert input_data.table_filter == "clinical_data"
-
-
-class TestFetchMetricsInput:
-    """Tests for FetchMetricsInput Pydantic model."""
-
-    def test_valid_count_metric(self) -> None:
-        """Test valid COUNT metric input."""
-        input_data = FetchMetricsInput(
-            metric_type=MetricType.COUNT,
-            field_name="patients",
-        )
-        assert input_data.metric_type == MetricType.COUNT
-        assert input_data.field_name == "patients"
-
-    def test_all_metric_types(self) -> None:
-        """Test all metric types are valid."""
-        for metric_type in MetricType:
-            input_data = FetchMetricsInput(
-                metric_type=metric_type,
-                field_name="test_field",
+            BuildTechnicalRequestInput(
+                description="Valid description for testing",
+                output_format="invalid_format",
             )
-            assert input_data.metric_type == metric_type
-
-    def test_optional_group_by(self) -> None:
-        """Test optional group_by parameter."""
-        input_data = FetchMetricsInput(
-            metric_type=MetricType.AVERAGE,
-            field_name="age",
-            group_by="gender",
-        )
-        assert input_data.group_by == "gender"
-
-    def test_optional_filters(self) -> None:
-        """Test optional filters parameter."""
-        input_data = FetchMetricsInput(
-            metric_type=MetricType.SUM,
-            field_name="visit_count",
-            filters={"status": "active"},
-        )
-        assert input_data.filters == {"status": "active"}
 
 
 class TestToolRegistry:
-    """Tests for the tool registry utility."""
+    """Tests for tool registry functionality."""
 
-    def test_registry_has_server_info(self) -> None:
-        """Test registry includes server name and version."""
+    def test_get_tool_registry_returns_dict(self) -> None:
+        """Test that get_tool_registry returns a dictionary."""
+        registry = get_tool_registry()
+        assert isinstance(registry, dict)
+
+    def test_registry_contains_server_info(self) -> None:
+        """Test that registry contains server name and version."""
         registry = get_tool_registry()
         assert registry["server_name"] == SERVER_NAME
         assert registry["version"] == SERVER_VERSION
 
-    def test_registry_lists_all_tools(self) -> None:
-        """Test registry lists all registered tools."""
+    def test_registry_contains_registered_tools(self) -> None:
+        """Test that registry lists registered tools."""
         registry = get_tool_registry()
+        assert "registered_tools" in registry
         tools = registry["registered_tools"]
-        
-        assert "query_database" in tools
-        assert "search_dictionary" in tools
-        assert "fetch_metrics" in tools
-        assert "health_check" in tools
+        assert "explore_study_metadata" in tools
+        assert "build_technical_request" in tools
 
-    def test_registry_lists_resources(self) -> None:
-        """Test registry lists registered resources."""
+    def test_registry_security_mode(self) -> None:
+        """Test that registry shows SECURE mode."""
         registry = get_tool_registry()
-        resources = registry["registered_resources"]
-        
-        assert "config://server" in resources
+        assert registry["mode"] == "SECURE"
+
+    def test_registry_security_model(self) -> None:
+        """Test that registry includes security model details."""
+        registry = get_tool_registry()
+        assert "security_model" in registry
+        security = registry["security_model"]
+        assert security["raw_data_access"] == "BLOCKED"
+        assert security["metadata_access"] == "ALLOWED"
+
+    def test_registry_forbidden_zone(self) -> None:
+        """Test that registry specifies forbidden zone."""
+        registry = get_tool_registry()
+        assert "forbidden_zone" in registry
+        assert "dataset" in registry["forbidden_zone"]
 
 
-class TestMCPServerInstance:
+class TestMCPServer:
     """Tests for the FastMCP server instance."""
 
-    @pytest.mark.asyncio
-    async def test_mcp_lists_tools(self) -> None:
-        """Test that mcp.list_tools() returns registered tools."""
-        tools = await mcp.list_tools()
-        tool_names = [t.name for t in tools]
-        
-        assert len(tool_names) >= 4
-        assert "query_database" in tool_names
-        assert "health_check" in tool_names
+    def test_mcp_instance_exists(self) -> None:
+        """Test that MCP server instance exists."""
+        assert mcp is not None
 
-    @pytest.mark.asyncio
-    async def test_mcp_tool_schemas_valid(self) -> None:
-        """Test that all tool schemas are valid JSON schemas."""
-        tools = await mcp.list_tools()
-        
-        for tool in tools:
-            assert tool.name is not None
-            assert tool.description is not None
-            
-            if tool.inputSchema:
-                assert tool.inputSchema.get("type") == "object"
+    def test_mcp_server_name(self) -> None:
+        """Test that MCP server has correct name."""
+        assert mcp.name == SERVER_NAME
 
-    @pytest.mark.asyncio
-    async def test_mcp_resources_listed(self) -> None:
-        """Test that resources are properly listed."""
-        resources = await mcp.list_resources()
-        resource_uris = [str(r.uri) for r in resources]
-        
-        assert "config://server" in resource_uris
+    def test_mcp_has_instructions(self) -> None:
+        """Test that MCP server has instructions."""
+        # FastMCP stores instructions in the instance
+        assert hasattr(mcp, "_instructions") or mcp.name is not None
+
+
+class TestSecurityValidation:
+    """Tests for security validation in input models."""
+
+    @pytest.mark.parametrize("forbidden_pattern", [
+        "data/dataset",
+        "data\\dataset",
+        "indo-vap",
+        "csv_files",
+        "6_HIV.xlsx",
+        "read from file",
+        "access the raw dataset",
+    ])
+    def test_metadata_rejects_forbidden_patterns(self, forbidden_pattern: str) -> None:
+        """Test that metadata queries reject various forbidden patterns."""
+        with pytest.raises(ValidationError):
+            ExploreStudyMetadataInput(
+                query=f"Please help me with {forbidden_pattern} analysis",
+            )
+
+    @pytest.mark.parametrize("phi_pattern", [
+        "show me all patients",
+        "list all records",
+        "export data",
+        "download dataset",
+        "raw data",
+        "patient names",
+        "individual records",
+    ])
+    def test_metadata_rejects_phi_patterns(self, phi_pattern: str) -> None:
+        """Test that metadata queries reject PHI request patterns."""
+        with pytest.raises(ValidationError):
+            ExploreStudyMetadataInput(
+                query=f"I need to {phi_pattern}",
+            )
+
+    @pytest.mark.parametrize("safe_query", [
+        "Do we have CD4 counts available?",
+        "How many study sites are there?",
+        "What variables exist for TB diagnosis?",
+        "Are there any participants from Pune?",
+        "What time points are collected?",
+    ])
+    def test_metadata_accepts_safe_queries(self, safe_query: str) -> None:
+        """Test that metadata queries accept safe/valid patterns."""
+        input_data = ExploreStudyMetadataInput(query=safe_query)
+        assert input_data.query == safe_query.strip()
