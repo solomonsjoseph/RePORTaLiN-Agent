@@ -283,32 +283,54 @@ class TestToolExecutionSecurity:
     """
     Tests for direct tool function security.
 
-    SECURE MODE: Four tools are available:
-    1. search_data_dictionary
-    2. search_cleaned_dataset
-    3. search_original_dataset
-    4. combined_search
+    SECURE MODE: Ten tools are available:
+    - PRIMARY TOOLS (use for most queries):
+      1. combined_search - DEFAULT for ALL queries, searches ALL data sources
+      2. natural_language_query - Complex multi-concept questions
+      3. cohort_summary - Participant overview
+      4. cross_tabulation - Variable relationships
+    - DETAILED ANALYSIS TOOLS:
+      5. variable_details - Deep dive into one variable
+      6. data_quality_report - Missing data analysis
+      7. multi_variable_comparison - Side-by-side statistics
+    - SUPPORTING TOOLS (specific needs only):
+      8. search_data_dictionary - Variable definitions ONLY (no statistics)
+      9. search_cleaned_dataset - Direct query when variable known
+      10. search_original_dataset - Fallback to original data
 
     All tools return AGGREGATE data only - never individual records.
     """
 
     @pytest.mark.asyncio
     @pytest.mark.security
-    async def test_exactly_four_tools_registered(self):
-        """Verify exactly four tools are registered."""
+    async def test_ten_tools_registered(self):
+        """Verify ten tools are registered."""
         from server.tools import get_tool_registry
 
         registry = get_tool_registry()
-        assert len(registry["registered_tools"]) == 4
+        assert len(registry["registered_tools"]) == 10
+        # Primary tools
+        assert "combined_search" in registry["registered_tools"]
+        assert "natural_language_query" in registry["registered_tools"]
+        assert "cohort_summary" in registry["registered_tools"]
+        assert "cross_tabulation" in registry["registered_tools"]
+        # Detailed analysis tools
+        assert "variable_details" in registry["registered_tools"]
+        assert "data_quality_report" in registry["registered_tools"]
+        assert "multi_variable_comparison" in registry["registered_tools"]
+        # Supporting tools
         assert "search_data_dictionary" in registry["registered_tools"]
         assert "search_cleaned_dataset" in registry["registered_tools"]
         assert "search_original_dataset" in registry["registered_tools"]
-        assert "combined_search" in registry["registered_tools"]
 
     @pytest.mark.asyncio
     @pytest.mark.security
     async def test_search_data_dictionary_validates_input(self):
-        """search_data_dictionary tool should validate input before execution."""
+        """search_data_dictionary tool should validate input before execution.
+        
+        NOTE: search_data_dictionary is for variable definitions ONLY.
+        For analytical queries with statistics, use combined_search instead.
+        """
         from server.tools import DictionarySearchInput, search_data_dictionary
         from unittest.mock import AsyncMock, MagicMock
 
@@ -325,7 +347,12 @@ class TestToolExecutionSecurity:
     @pytest.mark.asyncio
     @pytest.mark.security
     async def test_combined_search_validates_input(self):
-        """combined_search tool should validate input before execution."""
+        """combined_search tool should validate input before execution.
+        
+        NOTE: combined_search is THE DEFAULT TOOL for ALL queries.
+        It searches through ALL data sources (dictionary + cleaned + original).
+        Use this for any analytical question, counts, or distributions.
+        """
         from server.tools import CombinedSearchInput, combined_search
         from unittest.mock import AsyncMock, MagicMock
 

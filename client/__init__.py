@@ -28,18 +28,18 @@ Usage:
     >>> # Or use the canonical Phase 3 import:
     >>> from client.universal_client import UniversalMCPClient
     >>>
-    >>> # Direct MCP client usage
+    >>> # Direct MCP client usage (use combined_search as DEFAULT tool)
     >>> async with UniversalMCPClient(
     ...     server_url="http://localhost:8000/mcp/sse",
     ...     auth_token="your-token"
     ... ) as client:
     ...     tools = await client.get_tools_for_openai()
-    ...     result = await client.execute_tool("health_check", {})
+    ...     result = await client.execute_tool("combined_search", {"concept": "diabetes"})
     >>>
     >>> # Agent usage (recommended for LLM integration)
     >>> from client import MCPAgent
     >>> async with await MCPAgent.create() as agent:
-    ...     response = await agent.run("Check the system status")
+    ...     response = await agent.run("What is the diabetes prevalence?")
     ...     print(response)
 """
 

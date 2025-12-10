@@ -79,16 +79,16 @@ async def main() -> int:
             for tool in anthropic_tools:
                 print(f"   - {tool['name']}: {tool['description'][:50]}...")
 
-            # Execute health_check tool
-            print("\n🔧 Executing 'health_check' tool:")
-            result = await client.execute_tool("health_check", {})
+            # Execute combined_search tool (DEFAULT for all queries)
+            print("\n🔧 Executing 'combined_search' tool (DEFAULT for all analytical queries):")
+            result = await client.execute_tool("combined_search", {"concept": "diabetes"})
             print(f"   Result: {result[:200]}...")
-
-            # Execute search_dictionary tool
-            print("\n🔧 Executing 'search_dictionary' tool:")
+            
+            # Execute search_data_dictionary tool (ONLY for variable definitions)
+            print("\n🔧 Executing 'search_data_dictionary' tool (ONLY for variable definitions):")
             result = await client.execute_tool(
-                "search_dictionary",
-                {"search_term": "patient", "include_values": True}
+                "search_data_dictionary",
+                {"query": "diabetes"}
             )
             print(f"   Result: {result[:200]}...")
 

@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Enhanced MCP Tools (10 Total)**
+  - `natural_language_query` - Answer complex multi-concept questions in plain English
+  - `cohort_summary` - Comprehensive participant overview (Table 1 style)
+  - `cross_tabulation` - Analyze relationships between two categorical variables
+  - `variable_details` - Deep dive into one specific variable
+  - `data_quality_report` - Missing data and completeness analysis
+  - `multi_variable_comparison` - Side-by-side statistics for multiple variables
+
+- **New MCP Resources (6 Total)**
+  - `dictionary://codelists` - All codelist definitions
+  - `dictionary://table/{name}` - Specific table schema
+  - `dictionary://codelist/{name}` - Specific codelist values
+  - `study://variables/{category}` - Variables by category
+
+- **New MCP Prompts (4 Total)**
+  - `research_question_template` - Research question guidance
+  - `data_exploration_guide` - Data exploration steps
+  - `statistical_analysis_template` - Statistical analysis patterns
+  - `tb_outcome_analysis` - TB outcome specific guidance
+
+### Changed
+
+- **Tool Selection Behavior**
+  - `combined_search` is now THE DEFAULT TOOL for ALL queries
+  - Searches through ALL data sources (dictionary + cleaned + original datasets)
+  - Use for any analytical question, counts, statistics, or distributions
+  
+- **`search_data_dictionary` Role Clarified**
+  - Now explicitly for variable definitions ONLY (no statistics)
+  - Use ONLY when asking "what variables exist?" or "what does variable X mean?"
+  - For any analytical question, use `combined_search` instead
+
+- Updated SYSTEM_INSTRUCTIONS with Tool Selection Guide
+- Updated `dictionary://overview` resource with tool guidance
+- Updated all documentation (README, MCP_SERVER_SETUP, TESTING_GUIDE)
+- Updated test files to reflect 10 tools
+
 ## [2.1.0] - 2025-12-07
 
 ### Added

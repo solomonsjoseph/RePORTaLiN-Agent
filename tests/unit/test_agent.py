@@ -64,7 +64,10 @@ def local_llm_config() -> AgentConfig:
 
 @pytest.fixture
 def mock_mcp_client() -> AsyncMock:
-    """Create a mock MCP client."""
+    """Create a mock MCP client.
+    
+    Note: combined_search is the DEFAULT tool for all queries.
+    """
     client = AsyncMock()
     client.connect = AsyncMock()
     client.close = AsyncMock()
@@ -72,16 +75,22 @@ def mock_mcp_client() -> AsyncMock:
         {
             "type": "function",
             "function": {
-                "name": "health_check",
-                "description": "Check server health",
-                "parameters": {"type": "object", "properties": {}},
+                "name": "combined_search",
+                "description": "DEFAULT - Search ALL data sources for statistics",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "concept": {"type": "string"},
+                    },
+                    "required": ["concept"],
+                },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "query_database",
-                "description": "Execute a database query",
+                "name": "search_data_dictionary",
+                "description": "Variable definitions ONLY (no statistics)",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -92,7 +101,7 @@ def mock_mcp_client() -> AsyncMock:
             },
         },
     ])
-    client.execute_tool = AsyncMock(return_value='{"status": "healthy"}')
+    client.execute_tool = AsyncMock(return_value='{"concept": "diabetes", "variables_found": 5}')
     return client
 
 
@@ -263,7 +272,7 @@ class TestAgentInitialization:
         mock_mcp_client.connect.assert_called_once()
         mock_mcp_client.get_tools_for_openai.assert_called_once()
         assert len(agent._tools) == 2
-        assert agent._tool_names == ["health_check", "query_database"]
+        assert agent._tool_names == ["combined_search", "search_data_dictionary"]
 
         # Check system prompt was added
         assert len(agent.messages) == 1
@@ -359,11 +368,11 @@ class TestReActLoop:
                     content=None,
                     tool_calls=[{
                         "id": "call_123",
-                        "name": "health_check",
-                        "arguments": {},
+                        "name": "combined_search",
+                        "arguments": {"concept": "diabetes"},
                     }],
                 ),
-                create_completion_response("The system is healthy based on the check."),
+                create_completion_response("Found 5 diabetes-related variables in the dataset."),
             ]
         )
 
@@ -374,10 +383,10 @@ class TestReActLoop:
         )
 
         async with agent:
-            response = await agent.run("Check the health")
+            response = await agent.run("What diabetes data is available?")
 
-        assert "healthy" in response.lower()
-        mock_mcp_client.execute_tool.assert_called_once_with("health_check", {})
+        assert "diabetes" in response.lower() or "variables" in response.lower()
+        mock_mcp_client.execute_tool.assert_called_once_with("combined_search", {"concept": "diabetes"})
 
     @pytest.mark.asyncio
     async def test_run_with_multiple_tool_calls(
@@ -395,22 +404,22 @@ class TestReActLoop:
                     tool_calls=[
                         {
                             "id": "call_1",
-                            "name": "health_check",
-                            "arguments": {},
+                            "name": "combined_search",
+                            "arguments": {"concept": "diabetes"},
                         },
                         {
                             "id": "call_2",
-                            "name": "query_database",
-                            "arguments": {"query": "SELECT * FROM users"},
+                            "name": "search_data_dictionary",
+                            "arguments": {"query": "HIV"},
                         },
                     ],
                 ),
-                create_completion_response("Both checks completed successfully."),
+                create_completion_response("Found diabetes and HIV-related variables."),
             ]
         )
 
         mock_mcp_client.execute_tool = AsyncMock(
-            side_effect=['{"status": "healthy"}', '[{"id": 1, "name": "test"}]']
+            side_effect=['{"concept": "diabetes", "variables_found": 5}', '{"query": "HIV", "variables_found": 3}']
         )
 
         agent = MCPAgent(
@@ -420,7 +429,7 @@ class TestReActLoop:
         )
 
         async with agent:
-            await agent.run("Check health and query users")
+            await agent.run("Find diabetes and HIV variables")
 
         assert mock_mcp_client.execute_tool.call_count == 2
 
@@ -438,8 +447,8 @@ class TestReActLoop:
                 content=None,
                 tool_calls=[{
                     "id": "call_loop",
-                    "name": "health_check",
-                    "arguments": {},
+                    "name": "combined_search",
+                    "arguments": {"concept": "test"},
                 }],
             )
         )
@@ -523,8 +532,8 @@ class TestMessageHistory:
                     content=None,
                     tool_calls=[{
                         "id": "call_abc",
-                        "name": "health_check",
-                        "arguments": {},
+                        "name": "combined_search",
+                        "arguments": {"concept": "diabetes"},
                     }],
                 ),
                 create_completion_response("Done!"),
@@ -538,7 +547,7 @@ class TestMessageHistory:
         )
 
         async with agent:
-            await agent.run("Check health")
+            await agent.run("Find diabetes data")
 
             # Find tool result message
             tool_messages = [m for m in agent.messages if m.get("role") == "tool"]
@@ -597,19 +606,19 @@ class TestErrorHandling:
                     content=None,
                     tool_calls=[{
                         "id": "call_fail",
-                        "name": "query_database",
-                        "arguments": {"query": "SELECT * FROM nowhere"},
+                        "name": "combined_search",
+                        "arguments": {"concept": "nonexistent"},
                     }],
                 ),
-                create_completion_response("The query failed."),
+                create_completion_response("The search failed."),
             ]
         )
 
         # Make tool execution fail
         mock_mcp_client.execute_tool = AsyncMock(
             side_effect=MCPToolExecutionError(
-                "Table not found",
-                tool_name="query_database",
+                "Search failed",
+                tool_name="combined_search",
             )
         )
 
@@ -621,7 +630,7 @@ class TestErrorHandling:
 
         async with agent:
             # Should not raise - error is captured and sent to LLM
-            response = await agent.run("Query the database")
+            response = await agent.run("Search for nonexistent data")
             assert response is not None
 
     @pytest.mark.asyncio
@@ -667,35 +676,35 @@ class TestIntegration:
         # Simulate a realistic conversation
         mock_llm_client.chat.completions.create = AsyncMock(
             side_effect=[
-                # First: Check health
+                # First: Search for diabetes data
                 create_completion_response(
-                    content="Let me check the system status first.",
+                    content="Let me search for diabetes-related data first.",
                     tool_calls=[{
-                        "id": "call_health",
-                        "name": "health_check",
-                        "arguments": {},
+                        "id": "call_search",
+                        "name": "combined_search",
+                        "arguments": {"concept": "diabetes"},
                     }],
                 ),
-                # Second: Query database based on health
+                # Second: Look up specific variable definitions
                 create_completion_response(
-                    content="The system is healthy. Now let me query the database.",
+                    content="Found diabetes variables. Now let me get the definitions.",
                     tool_calls=[{
-                        "id": "call_query",
-                        "name": "query_database",
-                        "arguments": {"query": "SELECT * FROM users LIMIT 10"},
+                        "id": "call_dict",
+                        "name": "search_data_dictionary",
+                        "arguments": {"query": "DMSTAT"},
                     }],
                 ),
                 # Final: Summarize results
                 create_completion_response(
-                    "The system is healthy and I found 10 users in the database."
+                    "Found 5 diabetes-related variables including DMSTAT for diabetes status."
                 ),
             ]
         )
 
         mock_mcp_client.execute_tool = AsyncMock(
             side_effect=[
-                '{"status": "healthy", "version": "2.0.0"}',
-                '[{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]',
+                '{"concept": "diabetes", "variables_found": 5, "statistics": {"total": 100}}',
+                '{"query": "DMSTAT", "variables_found": 1, "variables": [{"field_name": "DMSTAT"}]}',
             ]
         )
 

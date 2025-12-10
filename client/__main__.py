@@ -66,7 +66,7 @@ def parse_args() -> argparse.Namespace:
         "--execute",
         type=str,
         default=None,
-        help="Tool name to execute (e.g., 'health_check')",
+        help="Tool name to execute (e.g., 'combined_search')",
     )
 
     parser.add_argument(

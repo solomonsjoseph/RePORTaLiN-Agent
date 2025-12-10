@@ -171,56 +171,107 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 ## Available Tools
 
-The MCP server exposes privacy-safe tools that LLMs can invoke:
+The MCP server exposes 10 privacy-safe tools that LLMs can invoke. **Use `combined_search` as the default for all queries.**
 
-### `query_database`
+### Tool Selection Guide
 
-Execute validated SQL-like queries against clinical data.
+| Query Type | Tool to Use |
+|------------|-------------|
+| Any analytical question | `combined_search` |
+| Counts, distributions, statistics | `combined_search` |
+| "How many patients have X?" | `combined_search` |
+| Complex multi-concept questions | `natural_language_query` |
+| Cohort overview / Table 1 | `cohort_summary` |
+| Variable relationships | `cross_tabulation` |
+| "What variables exist for X?" (definitions only) | `search_data_dictionary` |
+
+### Primary Tools
+
+#### `combined_search` (DEFAULT)
+
+**Use this for ALL analytical queries.** Searches through ALL data sources (dictionary + cleaned + original datasets).
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `query` | string | Yes | SQL SELECT query (10-2000 chars) |
-| `limit` | integer | No | Max rows to return (1-1000, default: 100) |
-| `include_metadata` | boolean | No | Include column metadata (default: false) |
+| `concept` | string | Yes | Clinical concept or research question (3-500 chars) |
+| `include_statistics` | boolean | No | Include aggregate stats (default: true) |
+| `include_codelists` | boolean | No | Include valid codes (default: true) |
 
 **Example:**
 ```json
 {
-  "name": "query_database",
+  "name": "combined_search",
   "arguments": {
-    "query": "SELECT age_group, COUNT(*) FROM patients GROUP BY age_group",
-    "limit": 50
+    "concept": "diabetes prevalence"
   }
 }
 ```
 
-### `search_dictionary`
+#### `natural_language_query`
 
-Search the data dictionary for variable definitions.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `search_term` | string | Yes | Term to search for |
-| `category` | string | No | Filter by category |
-| `limit` | integer | No | Max results (default: 20) |
-
-### `fetch_metrics`
-
-Retrieve aggregate statistics with k-anonymity protection.
+Answer complex questions in plain English with multi-variable analysis.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `metric_type` | enum | Yes | `count`, `sum`, `average`, `min`, `max`, `distribution` |
-| `field` | string | Yes | Field to aggregate |
-| `filters` | object | No | Filter conditions |
+| `question` | string | Yes | Natural language question (10-1000 chars) |
 
-### `health_check`
+#### `cohort_summary`
 
-Server health status and capabilities.
+Get comprehensive study overview (Table 1 style summary).
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `include_capabilities` | boolean | No | Include tool listing (default: false) |
+| `include_demographics` | boolean | No | Include demographics (default: true) |
+| `include_comorbidities` | boolean | No | Include comorbidities (default: true) |
+
+#### `cross_tabulation`
+
+Analyze relationships between two categorical variables.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `variable1` | string | Yes | First variable name |
+| `variable2` | string | Yes | Second variable name |
+
+### Supporting Tools
+
+#### `search_data_dictionary`
+
+Search for variable definitions ONLY - **does NOT return statistics**.
+
+Use ONLY when asking "what variables exist?" or "what does variable X mean?"
+For any analytical question, use `combined_search` instead.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | Term to search for |
+| `include_codelists` | boolean | No | Include codelist values (default: true) |
+
+#### `search_cleaned_dataset`
+
+Direct query to cleaned (de-identified) dataset when you already know the exact variable name.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `variable` | string | Yes | Exact variable name to query |
+| `table` | string | No | Specific table to search |
+
+#### `search_original_dataset`
+
+Fallback to original dataset when cleaned data is missing something.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `variable` | string | Yes | Exact variable name to query |
+| `table` | string | No | Specific table to search |
+
+### Additional Tools
+
+| Tool | Description |
+|------|-------------|
+| `variable_details` | Deep dive into one specific variable |
+| `data_quality_report` | Missing data and completeness analysis |
+| `multi_variable_comparison` | Side-by-side statistics for multiple variables |
 
 ---
 
@@ -248,16 +299,12 @@ async def main():
         # Get tools formatted for Anthropic Claude
         anthropic_tools = await client.get_tools_for_anthropic()
         
-        # Execute a tool
+        # Execute combined_search (DEFAULT tool for all queries)
         result = await client.execute_tool(
-            "query_database",
-            {"query": "SELECT COUNT(*) FROM studies", "limit": 10}
+            "combined_search",
+            {"concept": "diabetes prevalence"}
         )
         print(f"Result: {result}")
-        
-        # Health check
-        health = await client.execute_tool("health_check", {})
-        print(f"Server status: {health}")
 
 if __name__ == "__main__":
     asyncio.run(main())

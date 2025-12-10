@@ -37,8 +37,8 @@ Usage:
     ...     # For Anthropic-based agents
     ...     anthropic_tools = await client.get_tools_for_anthropic()
     ...
-    ...     # Execute a tool call
-    ...     result = await client.execute_tool("health_check", {})
+    ...     # Execute combined_search (DEFAULT tool for all queries)
+    ...     result = await client.execute_tool("combined_search", {"concept": "diabetes"})
     ...     print(result)
 
 Why This Module Exists:

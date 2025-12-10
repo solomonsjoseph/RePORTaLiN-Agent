@@ -112,9 +112,10 @@ class TestLiveServerConnection:
         ) as client:
             tools = await client.list_tools()
 
-            assert len(tools) >= 4
+            assert len(tools) >= 10
             tool_names = [t.name for t in tools]
-            assert "health_check" in tool_names
+            # Primary tool (DEFAULT for all queries)
+            assert "combined_search" in tool_names
 
     async def test_get_openai_tools_from_live_server(
         self, server_url: str, auth_token: str
@@ -126,7 +127,7 @@ class TestLiveServerConnection:
         ) as client:
             tools = await client.get_tools_for_openai()
 
-            assert len(tools) >= 4
+            assert len(tools) >= 10
             assert all(t["type"] == "function" for t in tools)
             assert all("function" in t for t in tools)
 
@@ -140,21 +141,21 @@ class TestLiveServerConnection:
         ) as client:
             tools = await client.get_tools_for_anthropic()
 
-            assert len(tools) >= 4
+            assert len(tools) >= 10
             assert all("name" in t for t in tools)
             assert all("input_schema" in t for t in tools)
 
-    async def test_execute_health_check_on_live_server(
+    async def test_execute_combined_search_on_live_server(
         self, server_url: str, auth_token: str
     ) -> None:
-        """Test executing health_check tool on live server."""
+        """Test executing combined_search tool (DEFAULT) on live server."""
         async with UniversalMCPClient(
             server_url=server_url,
             auth_token=auth_token,
         ) as client:
-            result = await client.execute_tool("health_check", {})
+            result = await client.execute_tool("combined_search", {"concept": "diabetes"})
 
-            assert "healthy" in result.lower() or "status" in result.lower()
+            assert "concept" in result.lower() or "variables" in result.lower() or "diabetes" in result.lower()
 
     async def test_list_resources_from_live_server(
         self, server_url: str, auth_token: str

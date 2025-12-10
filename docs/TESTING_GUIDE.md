@@ -114,13 +114,19 @@ uv run python verify.py --token your-secret-token
 ```
 🔍 Verifying MCP Server at: http://localhost:8000/mcp/sse
 
-✅ System Online: Found 4 tools
+✅ System Online: Found 10 tools
 
 📋 Available Tools:
-   • fetch_metrics
-   • health_check
-   • query_database
-   • search_dictionary
+   • combined_search (DEFAULT - use for all queries)
+   • natural_language_query
+   • cohort_summary
+   • cross_tabulation
+   • variable_details
+   • data_quality_report
+   • multi_variable_comparison
+   • search_data_dictionary (variable definitions only)
+   • search_cleaned_dataset
+   • search_original_dataset
 ```
 
 **Failure:**

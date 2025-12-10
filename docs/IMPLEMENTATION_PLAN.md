@@ -59,8 +59,8 @@ Based on workspace analysis, the following components are **already in place**:
 | K-Anonymity Enforcement | ✅ Complete | `MIN_K_ANONYMITY = 5` |
 | Docker Deployment | ✅ Complete | `Dockerfile`, `docker-compose.yml` |
 | **Data Pipeline Connector** | ✅ Complete | `server/data_pipeline.py` |
-| **Three-Tool Design Pattern** | ✅ Complete | `list_datasets`, `describe_schema`, `query_database` |
-| **Pipeline Status Tool** | ✅ Complete | `get_pipeline_status` tool |
+| **10-Tool MCP Design** | ✅ Complete | `combined_search` (default), 9 supporting tools |
+| **Pipeline Status Tool** | ✅ Complete | Via `cohort_summary` tool |
 
 ### Core Data Pipeline Flow ✅
 
@@ -348,15 +348,24 @@ class DatabasePool:
 Priority: HIGH | Effort: Medium | Dependencies: 2.2
 ```
 
-The **Three-Tool Design** is optimal for clinical data querying:
+The **10-Tool MCP Design** is now implemented for clinical data querying:
+
+**Tool Selection Guide:** Use `combined_search` as the DEFAULT for ALL queries.
 
 | Tool | Purpose | Example Query |
 |------|---------|---------------|
-| `list_datasets` | Discover available study data | "What datasets are available?" |
-| `describe_schema` | Get table/field definitions | "What fields are in the DM domain?" |
-| `query_data` | Execute validated queries | "Get demographics for subjects age > 40" |
+| `combined_search` | **DEFAULT** - Search ALL data sources | "How many have diabetes?" |
+| `natural_language_query` | Complex multi-concept questions | "Compare outcomes by HIV status" |
+| `cohort_summary` | Comprehensive participant overview | "Give me a cohort overview" |
+| `cross_tabulation` | Analyze variable relationships | "Is HIV associated with outcome?" |
+| `variable_details` | Deep dive into one variable | "Tell me about AGE variable" |
+| `data_quality_report` | Missing data analysis | "What data quality issues?" |
+| `multi_variable_comparison` | Side-by-side statistics | "Compare AGE, BMI, CD4" |
+| `search_data_dictionary` | Variable definitions ONLY | "What variables exist for HIV?" |
+| `search_cleaned_dataset` | Direct query (known variable) | Query with exact field name |
+| `search_original_dataset` | Fallback to original data | When cleaned data missing |
 
-**Current State:** `server/tools.py` has `query_database`, `search_dictionary`, `fetch_metrics`.
+**Current State:** `server/tools.py` has all 10 tools implemented.
 
 **Enhancement - Add Missing Tools:**
 

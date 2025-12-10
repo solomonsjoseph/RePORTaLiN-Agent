@@ -30,26 +30,32 @@ from client.mcp_client import (
 
 @pytest.fixture
 def sample_mcp_tools() -> list[types.Tool]:
-    """Create sample MCP tools for testing."""
+    """Create sample MCP tools for testing.
+    
+    Note: combined_search is the DEFAULT tool for all queries.
+    """
     return [
         types.Tool(
-            name="query_database",
-            description="Execute a SQL query on the database",
+            name="combined_search",
+            description="DEFAULT tool - Search ALL data sources for statistics",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "SQL query"},
-                    "limit": {"type": "integer", "default": 100},
+                    "concept": {"type": "string", "description": "Clinical concept to search"},
+                    "include_statistics": {"type": "boolean", "default": True},
                 },
-                "required": ["query"],
+                "required": ["concept"],
             },
         ),
         types.Tool(
-            name="health_check",
-            description="Check server health status",
+            name="search_data_dictionary",
+            description="Variable definitions ONLY (no statistics)",
             inputSchema={
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    "query": {"type": "string", "description": "Search term"},
+                },
+                "required": ["query"],
             },
         ),
     ]
@@ -101,15 +107,15 @@ class TestSchemaAdaptation:
             auth_token="test-token",
         )
 
-        tool = sample_mcp_tools[0]  # query_database
+        tool = sample_mcp_tools[0]  # combined_search
         result = client._tool_to_openai(tool)
 
         assert result["type"] == "function"
-        assert result["function"]["name"] == "query_database"
-        assert result["function"]["description"] == "Execute a SQL query on the database"
+        assert result["function"]["name"] == "combined_search"
+        assert "DEFAULT" in result["function"]["description"] or "Search" in result["function"]["description"]
         assert result["function"]["parameters"]["type"] == "object"
-        assert "query" in result["function"]["parameters"]["properties"]
-        assert result["function"]["parameters"]["required"] == ["query"]
+        assert "concept" in result["function"]["parameters"]["properties"]
+        assert result["function"]["parameters"]["required"] == ["concept"]
 
     def test_tool_to_anthropic_format(self, sample_mcp_tools: list[types.Tool]) -> None:
         """Test conversion to Anthropic tool format."""
@@ -118,13 +124,13 @@ class TestSchemaAdaptation:
             auth_token="test-token",
         )
 
-        tool = sample_mcp_tools[0]  # query_database
+        tool = sample_mcp_tools[0]  # combined_search
         result = client._tool_to_anthropic(tool)
 
-        assert result["name"] == "query_database"
-        assert result["description"] == "Execute a SQL query on the database"
+        assert result["name"] == "combined_search"
+        assert "DEFAULT" in result["description"] or "Search" in result["description"]
         assert result["input_schema"]["type"] == "object"
-        assert "query" in result["input_schema"]["properties"]
+        assert "concept" in result["input_schema"]["properties"]
 
     def test_tool_with_empty_schema(self) -> None:
         """Test conversion of tool with empty input schema."""
@@ -282,12 +288,12 @@ class TestExceptions:
         """Test MCPToolExecutionError with tool name."""
         error = MCPToolExecutionError(
             "Tool failed",
-            tool_name="query_database",
+            tool_name="combined_search",
             is_error=True,
         )
 
         assert str(error) == "Tool failed"
-        assert error.tool_name == "query_database"
+        assert error.tool_name == "combined_search"
         assert error.is_error is True
 
 
@@ -316,7 +322,7 @@ class TestMockConnection:
         tools = await client.list_tools(use_cache=False)
 
         assert len(tools) == 2
-        assert tools[0].name == "query_database"
+        assert tools[0].name == "combined_search"
         mock_session.list_tools.assert_called_once()
 
     @pytest.mark.asyncio
@@ -337,7 +343,7 @@ class TestMockConnection:
 
         assert len(tools) == 2
         assert all(t["type"] == "function" for t in tools)
-        assert tools[0]["function"]["name"] == "query_database"
+        assert tools[0]["function"]["name"] == "combined_search"
 
     @pytest.mark.asyncio
     async def test_get_tools_for_anthropic_with_mock(self, sample_mcp_tools: list[types.Tool]) -> None:
@@ -356,7 +362,7 @@ class TestMockConnection:
         tools = await client.get_tools_for_anthropic()
 
         assert len(tools) == 2
-        assert tools[0]["name"] == "query_database"
+        assert tools[0]["name"] == "combined_search"
         assert "input_schema" in tools[0]
 
     @pytest.mark.asyncio
@@ -371,7 +377,7 @@ class TestMockConnection:
         mock_result = MagicMock()
         mock_result.isError = False
         mock_result.content = [
-            types.TextContent(type="text", text='{"status": "healthy"}'),
+            types.TextContent(type="text", text='{"concept": "diabetes", "variables_found": 5}'),
         ]
 
         mock_session = AsyncMock()
@@ -380,10 +386,10 @@ class TestMockConnection:
         client._session = mock_session
         client._state.connected = True
 
-        result = await client.execute_tool("health_check", {})
+        result = await client.execute_tool("combined_search", {"concept": "diabetes"})
 
-        assert '{"status": "healthy"}' in result
-        mock_session.call_tool.assert_called_once_with("health_check", {})
+        assert "diabetes" in result or "variables_found" in result
+        mock_session.call_tool.assert_called_once_with("combined_search", {"concept": "diabetes"})
 
     @pytest.mark.asyncio
     async def test_execute_tool_error_response(self) -> None:
@@ -397,7 +403,7 @@ class TestMockConnection:
         mock_result = MagicMock()
         mock_result.isError = True
         mock_result.content = [
-            types.TextContent(type="text", text="Query validation failed"),
+            types.TextContent(type="text", text="Search validation failed"),
         ]
 
         mock_session = AsyncMock()
@@ -407,10 +413,10 @@ class TestMockConnection:
         client._state.connected = True
 
         with pytest.raises(MCPToolExecutionError) as exc_info:
-            await client.execute_tool("query_database", {"query": "invalid"})
+            await client.execute_tool("combined_search", {"concept": "invalid"})
 
-        assert exc_info.value.tool_name == "query_database"
-        assert "Query validation failed" in str(exc_info.value)
+        assert exc_info.value.tool_name == "combined_search"
+        assert "Search validation failed" in str(exc_info.value)
 
 
 # =============================================================================

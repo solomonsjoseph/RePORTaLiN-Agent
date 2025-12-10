@@ -85,15 +85,32 @@ Connects MCP tools to de-identified results:
 
 ## MCP Tools
 
+**Tool Selection Guide:** Use `combined_search` as the DEFAULT for ALL queries.
+
+### Primary Tools (Use for Most Questions)
+
 | Tool | Purpose | Privacy |
 |------|---------|---------|
-| `get_pipeline_status` | Check if pipeline has been run | N/A |
-| `list_datasets` | Discover available datasets | N/A |
-| `describe_schema` | Get field definitions | N/A |
-| `query_database` | Execute queries | K-anonymity protected |
-| `search_dictionary` | Search data dictionary | N/A |
-| `fetch_metrics` | Compute statistics | K-anonymity protected |
-| `health_check` | Server status | N/A |
+| `combined_search` | **DEFAULT** - Search ALL data sources for statistics | K-anonymity protected |
+| `natural_language_query` | Complex multi-concept questions | K-anonymity protected |
+| `cohort_summary` | Comprehensive participant overview | K-anonymity protected |
+| `cross_tabulation` | Analyze variable relationships | K-anonymity protected |
+
+### Detailed Analysis Tools
+
+| Tool | Purpose | Privacy |
+|------|---------|---------|
+| `variable_details` | Deep dive into one variable | K-anonymity protected |
+| `data_quality_report` | Missing data analysis | K-anonymity protected |
+| `multi_variable_comparison` | Side-by-side statistics | K-anonymity protected |
+
+### Supporting Tools (Specific Needs Only)
+
+| Tool | Purpose | When to Use |
+|------|---------|-------------|
+| `search_data_dictionary` | Variable definitions ONLY | Only for "what variables exist?" |
+| `search_cleaned_dataset` | Direct query to cleaned data | When exact variable name known |
+| `search_original_dataset` | Fallback to original data | When cleaned data missing |
 
 ## Quick Start
 

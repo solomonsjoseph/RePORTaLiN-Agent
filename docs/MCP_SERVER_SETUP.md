@@ -61,7 +61,7 @@ uv run python tests/integration/test_server_startup.py
 
 ```
 ✓ 30/30 unit tests passing
-✓ 4/4 tools properly registered
+✓ 10/10 tools properly registered
 ✓ SERVER IS READY FOR USE
 ```
 
@@ -165,14 +165,43 @@ Claude should automatically use the `get_study_variables` tool.
 
 ## Available Tools
 
+### Tool Selection Guide
+
+**DEFAULT BEHAVIOR: Use `combined_search` for ALL queries unless specifically asking about variable definitions.**
+
+| Query Type | Tool to Use |
+|------------|-------------|
+| Any analytical question | `combined_search` |
+| Counts, distributions, statistics | `combined_search` |
+| "How many patients have X?" | `combined_search` |
+| "What is the distribution of Y?" | `combined_search` |
+| "What variables exist for X?" | `search_data_dictionary` |
+| "What does variable Y mean?" | `search_data_dictionary` |
+
+### Primary Tools (Use for Most Questions)
+
 | Tool | Description | Example Query |
 |------|-------------|---------------|
-| `get_study_variables` | Search variables by natural language | "Find TB treatment variables" |
-| `generate_federated_code` | Generate privacy-safe analysis code | "Code for HIV logistic regression" |
-| `get_data_schema` | Explore dataset structure | "Show baseline table schema" |
-| `get_aggregate_statistics` | K-anonymity protected stats | "Age distribution statistics" |
-| `list_variables_for_code` | List variable codes for code generation | "LIST_VARS" |
-| `get_data_source_info` | DPDPA compliance information | "Show data source policy" |
+| `combined_search` | **DEFAULT** - Searches ALL data sources for statistics | "How many have diabetes?", "Age distribution" |
+| `natural_language_query` | Complex multi-concept questions | "Compare outcomes between smokers and non-smokers" |
+| `cohort_summary` | Comprehensive participant overview | "Give me an overview of the cohort" |
+| `cross_tabulation` | Analyze relationships between two variables | "Is HIV associated with outcome?" |
+
+### Detailed Analysis Tools
+
+| Tool | Description | Example Query |
+|------|-------------|---------------|
+| `variable_details` | Deep dive into ONE specific variable | "Tell me everything about AGE" |
+| `data_quality_report` | Missing data and completeness analysis | "What data quality issues exist?" |
+| `multi_variable_comparison` | Side-by-side statistics | "Compare AGE, BMI, and CD4 statistics" |
+
+### Supporting Tools (Specific Needs Only)
+
+| Tool | Description | When to Use |
+|------|-------------|-------------|
+| `search_data_dictionary` | Variable definitions ONLY (no statistics) | Only when asking "what variables exist?" |
+| `search_cleaned_dataset` | Direct query to cleaned data | When exact variable name is known |
+| `search_original_dataset` | Fallback to original data | When cleaned data is missing something |
 
 ## Troubleshooting
 

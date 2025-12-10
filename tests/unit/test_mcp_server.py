@@ -109,14 +109,30 @@ class TestToolRegistry:
         assert registry["version"] == SERVER_VERSION
 
     def test_registry_contains_registered_tools(self) -> None:
-        """Test that registry lists registered tools."""
+        """Test that registry lists registered tools.
+        
+        Tool Selection Guide:
+        - combined_search: DEFAULT for ALL queries (searches ALL data sources)
+        - search_data_dictionary: ONLY for variable definitions (no statistics)
+        - search_cleaned_dataset: Direct query when variable name is known
+        - search_original_dataset: Fallback to original data
+        """
         registry = get_tool_registry()
         assert "registered_tools" in registry
         tools = registry["registered_tools"]
+        # Primary tool (default for all queries)
+        assert "combined_search" in tools
+        # Supporting tools
         assert "search_data_dictionary" in tools
         assert "search_cleaned_dataset" in tools
         assert "search_original_dataset" in tools
-        assert "combined_search" in tools
+        # New tools added
+        assert "natural_language_query" in tools
+        assert "cohort_summary" in tools
+        assert "cross_tabulation" in tools
+        assert "variable_details" in tools
+        assert "data_quality_report" in tools
+        assert "multi_variable_comparison" in tools
 
     def test_registry_contains_data_loaded_info(self) -> None:
         """Test that registry shows data loaded statistics."""

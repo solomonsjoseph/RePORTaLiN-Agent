@@ -35,8 +35,8 @@ Usage:
     ...     # Get tools for OpenAI
     ...     openai_tools = await client.get_tools_for_openai()
     ...
-    ...     # Execute a tool
-    ...     result = await client.execute_tool("health_check", {})
+    ...     # Execute combined_search (DEFAULT tool for all queries)
+    ...     result = await client.execute_tool("combined_search", {"concept": "diabetes"})
     ...     print(result)
     >>>
     >>> # Or manage lifecycle manually
@@ -44,7 +44,7 @@ Usage:
     >>> await client.connect()
     >>> try:
     ...     tools = await client.get_tools_for_anthropic()
-    ...     result = await client.execute_tool("query_database", {"query": "SELECT ..."})
+    ...     result = await client.execute_tool("combined_search", {"concept": "HIV status"})
     ... finally:
     ...     await client.close()
 
@@ -324,7 +324,7 @@ class UniversalMCPClient:
         ...     "my-auth-token"
         ... ) as client:
         ...     tools = await client.get_tools_for_openai()
-        ...     result = await client.execute_tool("health_check", {})
+        ...     result = await client.execute_tool("combined_search", {"concept": "diabetes"})
     """
 
     def __init__(
@@ -740,9 +740,10 @@ class UniversalMCPClient:
             MCPToolExecutionError: If tool execution fails
 
         Example:
+            >>> # Use combined_search as the DEFAULT tool for all queries
             >>> result = await client.execute_tool(
-            ...     "query_database",
-            ...     {"query": "SELECT * FROM patients LIMIT 10", "limit": 10}
+            ...     "combined_search",
+            ...     {"concept": "diabetes prevalence"}
             ... )
             >>> print(result)
         """
@@ -881,7 +882,7 @@ async def create_client(
         Remember to call close() when done:
         >>> client = await create_client(url, token)
         >>> try:
-        ...     result = await client.execute_tool("health_check", {})
+        ...     result = await client.execute_tool("combined_search", {"concept": "HIV"})
         ... finally:
         ...     await client.close()
     """
