@@ -37,6 +37,8 @@ Example:
         supported = manager.get_supported_countries()
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import re
@@ -55,8 +57,11 @@ __all__ = [
     # Enums
     "DataFieldType",
     "PrivacyLevel",
-    # Helper Function
+    # Helper Functions
+    "get_all_supported_countries",
     "get_common_fields",
+    "get_regulation_for_country",
+    "merge_regulations",
 ]
 
 # ============================================================================
@@ -114,7 +119,14 @@ class DataField:
             self.compiled_pattern = None
 
     def validate(self, value: str) -> bool:
-        """Validate value against field's pattern."""
+        """Validate value against field's pattern.
+
+        Args:
+            value: String value to validate.
+
+        Returns:
+            True if value matches pattern or no pattern defined, False otherwise.
+        """
         if not self.compiled_pattern:
             return True
         return bool(self.compiled_pattern.match(value))
@@ -134,11 +146,19 @@ class CountryRegulation:
     requirements: list[str] = field(default_factory=list)
 
     def get_all_fields(self) -> list[DataField]:
-        """Get all data fields (common + specific)."""
+        """Get all data fields (common + specific).
+
+        Returns:
+            Combined list of common and country-specific DataField objects.
+        """
         return self.common_fields + self.specific_fields
 
     def get_high_privacy_fields(self) -> list[DataField]:
-        """Get fields with HIGH or CRITICAL privacy level."""
+        """Get fields with HIGH or CRITICAL privacy level.
+
+        Returns:
+            List of DataField objects with elevated privacy requirements.
+        """
         return [
             f
             for f in self.get_all_fields()
@@ -146,7 +166,11 @@ class CountryRegulation:
         ]
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
+        """Convert to dictionary for serialization.
+
+        Returns:
+            Dictionary representation suitable for JSON export.
+        """
         return {
             "country_code": self.country_code,
             "country_name": self.country_name,
@@ -1411,7 +1435,11 @@ def merge_regulations(country_codes: list[str]) -> dict[str, Any]:
 
 
 def main():
-    """Command-line interface for testing regulations."""
+    """Command-line interface for testing regulations.
+
+    Returns:
+        None. Prints regulation information to stdout.
+    """
     import argparse
 
     parser = argparse.ArgumentParser(

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Security Middleware for MCP Server.
 
@@ -49,9 +50,15 @@ if TYPE_CHECKING:
     from starlette.types import ASGIApp, Receive, Scope, Send
 
 __all__ = [
+    # Middleware classes
     "InputValidationMiddleware",
     "RateLimitMiddleware",
     "SecurityHeadersMiddleware",
+    # Constants (for customization)
+    "DEFAULT_SECURITY_HEADERS",
+    "MAX_HEADER_VALUE_LENGTH",
+    "MAX_QUERY_PARAM_LENGTH",
+    "MAX_QUERY_STRING_LENGTH",
 ]
 
 
@@ -176,7 +183,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         request: Request,
         call_next: Callable[[Request], Any],
     ) -> Response:
-        """Add security headers to response."""
+        """Add security headers to response.
+
+        Args:
+            request: The incoming HTTP request.
+            call_next: Callable to invoke the next middleware/handler.
+
+        Returns:
+            Response with security headers added.
+        """
         response = await call_next(request)
 
         # Skip excluded paths (e.g., health checks)
@@ -251,7 +266,13 @@ class InputValidationMiddleware:
         receive: Receive,
         send: Send,
     ) -> None:
-        """ASGI interface - validate inputs before forwarding."""
+        """ASGI interface - validate inputs before forwarding.
+
+        Args:
+            scope: ASGI connection scope containing request metadata.
+            receive: ASGI receive callable.
+            send: ASGI send callable.
+        """
         # Only validate HTTP requests
         if scope["type"] != "http":
             await self.app(scope, receive, send)
@@ -308,7 +329,14 @@ class InputValidationMiddleware:
         error: str,
         detail: str,
     ) -> None:
-        """Send an error response."""
+        """Send an error response.
+
+        Args:
+            send: ASGI send callable.
+            status: HTTP status code (e.g., 414, 431).
+            error: Short error code for machine parsing.
+            detail: Human-readable error description.
+        """
         import json
 
         body = json.dumps({
@@ -395,13 +423,21 @@ class RateLimitMiddleware:
         self.client_id_extractor = client_id_extractor or self._default_client_id
 
     def _default_client_id(self, scope: Scope) -> str:
-        """
-        Extract client identifier from request scope.
+        """Extract client identifier from request scope.
+
+        Determines the client IP address for rate limiting purposes,
+        handling various proxy configurations.
+
+        Args:
+            scope: ASGI connection scope containing headers and client info.
+
+        Returns:
+            Client IP address string, or "unknown" if not determinable.
 
         Priority:
-        1. X-Forwarded-For (first IP, if behind proxy)
-        2. X-Real-IP (nginx)
-        3. Connection client IP
+            1. X-Forwarded-For (first IP, if behind proxy)
+            2. X-Real-IP (nginx)
+            3. Connection client IP
         """
         headers = dict(scope.get("headers", []))
 
@@ -429,7 +465,13 @@ class RateLimitMiddleware:
         receive: Receive,
         send: Send,
     ) -> None:
-        """ASGI interface - enforce rate limits."""
+        """ASGI interface - enforce rate limits.
+
+        Args:
+            scope: ASGI connection scope containing request metadata.
+            receive: ASGI receive callable.
+            send: ASGI send callable.
+        """
         # Only apply to HTTP requests
         if scope["type"] != "http":
             await self.app(scope, receive, send)
@@ -472,7 +514,12 @@ class RateLimitMiddleware:
         send: Send,
         result: RateLimitResult,
     ) -> None:
-        """Send 429 Too Many Requests response."""
+        """Send 429 Too Many Requests response.
+
+        Args:
+            send: ASGI send callable.
+            result: Rate limit check result with retry information.
+        """
         import json
 
         body = json.dumps({

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 RePORTaLiN-Specialist Core Package.
 
@@ -62,6 +63,8 @@ See Also:
     - scripts/utils/logging.py - Base logging implementation
     - server/ - MCP server implementation
 """
+
+from __future__ import annotations
 
 from .log_decryptor import (
     AuthorizationError,

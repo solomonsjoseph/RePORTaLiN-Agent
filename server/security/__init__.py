@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Security Module for RePORTaLiN MCP Server.
 
@@ -30,6 +31,8 @@ Usage:
     >>>     raise RateLimitExceeded()
 """
 
+from __future__ import annotations
+
 from server.security.encryption import (
     AES256GCMCipher,
     DecryptionError,
@@ -59,17 +62,17 @@ __all__ = [
     "DecryptionError",
     "EncryptedPayload",
     "EncryptionError",
-    "InMemoryRateLimiter",
+    # Middleware
     "InputValidationMiddleware",
-    "RateLimitConfig",
-    "RateLimitExceeded",
     "RateLimitMiddleware",
+    "SecurityHeadersMiddleware",
     # Rate Limiting
+    "InMemoryRateLimiter",
+    "RateLimitConfig",
     "RateLimiter",
-    "RotatableSecret",
+    "RateLimitExceeded",
     # Secrets
+    "RotatableSecret",
     "SecretRotator",
     "SecretValidationResult",
-    # Middleware
-    "SecurityHeadersMiddleware",
 ]

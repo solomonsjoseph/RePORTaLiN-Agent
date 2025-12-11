@@ -297,7 +297,11 @@ class SessionAnalytics:
             self._active_estimate = max(0, self._active_estimate - 1)
 
     async def get_stats(self) -> dict[str, int]:
-        """Get connection statistics."""
+        """Get connection statistics.
+
+        Returns:
+            Dictionary with 'total_connections' and 'active_estimate' counts.
+        """
         async with self._lock:
             return {
                 "total_connections": self._connections_total,
@@ -305,8 +309,8 @@ class SessionAnalytics:
             }
 
 
-# Global analytics instance
-session_analytics = SessionAnalytics()
+# Global analytics instance (internal use only)
+_session_analytics = SessionAnalytics()
 
 
 # =============================================================================
@@ -342,7 +346,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     # === Shutdown ===
-    stats = await session_analytics.get_stats()
+    stats = await _session_analytics.get_stats()
     logger.info(
         "MCP Server stopped",
         total_connections=stats["total_connections"],
@@ -530,7 +534,7 @@ def create_app() -> FastAPI:
         }
 
         if auth.is_authenticated:
-            stats = await session_analytics.get_stats()
+            stats = await _session_analytics.get_stats()
             base_status.update({
                 "environment": settings.environment.value,
                 "transport": "sse",
@@ -767,6 +771,9 @@ def run_server(
         host: Bind host (defaults to settings.mcp_host)
         port: Bind port (defaults to settings.mcp_port)
         reload: Enable auto-reload (only works in local environment)
+
+    Raises:
+        SystemExit: If uvicorn fails to start or encounters a fatal error.
 
     Example:
         >>> from server.main import run_server

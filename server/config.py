@@ -62,6 +62,7 @@ __all__ = [
     "Settings",
     "get_project_root",
     "get_settings",
+    "reload_settings",
 ]
 
 
@@ -315,7 +316,14 @@ class Settings(BaseSettings):
     @field_validator("mcp_transport")
     @classmethod
     def validate_transport(cls, v: str) -> str:
-        """Validate transport is one of the supported types."""
+        """Validate transport is one of the supported types.
+
+        Returns:
+            Lowercase transport string.
+
+        Raises:
+            ValueError: If transport is not stdio, http, or sse.
+        """
         allowed = {"stdio", "http", "sse"}
         if v.lower() not in allowed:
             raise ValueError(f"mcp_transport must be one of {allowed}, got '{v}'")
@@ -324,7 +332,14 @@ class Settings(BaseSettings):
     @field_validator("privacy_mode")
     @classmethod
     def validate_privacy_mode(cls, v: str) -> str:
-        """Validate privacy mode is one of the supported types."""
+        """Validate privacy mode is one of the supported types.
+
+        Returns:
+            Lowercase privacy mode string.
+
+        Raises:
+            ValueError: If privacy mode is not strict or standard.
+        """
         allowed = {"strict", "standard"}
         if v.lower() not in allowed:
             raise ValueError(f"privacy_mode must be one of {allowed}, got '{v}'")
@@ -333,7 +348,14 @@ class Settings(BaseSettings):
     @field_validator("log_format")
     @classmethod
     def validate_log_format(cls, v: str) -> str:
-        """Validate log format is one of the supported types."""
+        """Validate log format is one of the supported types.
+
+        Returns:
+            Lowercase log format string.
+
+        Raises:
+            ValueError: If log format is not json, pretty, or auto.
+        """
         allowed = {"json", "pretty", "auto"}
         if v.lower() not in allowed:
             raise ValueError(f"log_format must be one of {allowed}, got '{v}'")

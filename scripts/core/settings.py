@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Centralized Settings Module using Pydantic Settings.
 
@@ -76,7 +77,11 @@ class LogLevel(str, Enum):
     CRITICAL = "CRITICAL"
 
     def to_logging_level(self) -> int:
-        """Convert to Python logging level integer."""
+        """Convert to Python logging level integer.
+
+        Returns:
+            Integer logging level (e.g., 10 for DEBUG, 20 for INFO).
+        """
         return getattr(logging, self.value)
 
 
@@ -132,7 +137,14 @@ class EncryptionSettings(BaseSettings):
     @field_validator("public_key_path", "private_key_path", mode="before")
     @classmethod
     def resolve_path(cls, v: Any) -> Path | None:
-        """Resolve and validate key paths."""
+        """Resolve and validate key paths.
+
+        Args:
+            v: Raw path value (string, Path, or None).
+
+        Returns:
+            Resolved absolute Path or None if input is None.
+        """
         if v is None:
             return None
         path = Path(v).expanduser().resolve()
@@ -141,7 +153,14 @@ class EncryptionSettings(BaseSettings):
     @field_validator("authorized_key_fingerprints", mode="before")
     @classmethod
     def parse_fingerprints(cls, v: Any) -> list[str]:
-        """Parse fingerprints from comma-separated string or list."""
+        """Parse fingerprints from comma-separated string or list.
+
+        Args:
+            v: Fingerprints as comma-separated string or list.
+
+        Returns:
+            List of fingerprint strings (empty list if None).
+        """
         if isinstance(v, str):
             return [f.strip() for f in v.split(",") if f.strip()]
         return v or []
@@ -205,14 +224,25 @@ class LoggingSettings(BaseSettings):
     @field_validator("log_dir", "encrypted_log_dir", mode="before")
     @classmethod
     def resolve_log_path(cls, v: Any) -> Path:
-        """Resolve log directory paths."""
+        """Resolve log directory paths.
+
+        Args:
+            v: Raw path value (string or Path).
+
+        Returns:
+            Path object (relative paths resolved later in Settings).
+        """
         if isinstance(v, str):
             return Path(v)
         return v
 
     @model_validator(mode="after")
     def set_verbose_level(self) -> LoggingSettings:
-        """Set DEBUG level when verbose is enabled."""
+        """Set DEBUG level when verbose is enabled.
+
+        Returns:
+            Self with level set to DEBUG if verbose=True.
+        """
         if self.verbose:
             self.level = LogLevel.DEBUG
         return self
@@ -272,7 +302,14 @@ class MCPSettings(BaseSettings):
     @field_validator("host")
     @classmethod
     def validate_host_security(cls, v: str) -> str:
-        """Enforce localhost binding for SSE mode."""
+        """Enforce localhost binding for SSE mode.
+
+        Args:
+            v: Host address string.
+
+        Returns:
+            The host value (unchanged), with a warning if not localhost.
+        """
         allowed_hosts = {"127.0.0.1", "localhost", "::1"}
         if v not in allowed_hosts:
             import warnings
@@ -353,7 +390,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def resolve_paths(self) -> Settings:
-        """Resolve default paths relative to root_dir."""
+        """Resolve default paths relative to root_dir.
+
+        Returns:
+            Self with data_dir, results_dir, and log directories resolved
+            to absolute paths.
+        """
         if self.data_dir is None:
             self.data_dir = self.root_dir / "data"
         if self.results_dir is None:
@@ -394,7 +436,11 @@ class Settings(BaseSettings):
         )
 
     def ensure_directories(self) -> None:
-        """Create necessary directories if they don't exist."""
+        """Create necessary directories if they don't exist.
+
+        Returns:
+            None. Directories are created as a side effect.
+        """
         directories = [
             self.results_dir,
             self.clean_dataset_dir,
@@ -406,7 +452,12 @@ class Settings(BaseSettings):
             directory.mkdir(parents=True, exist_ok=True)
 
     def validate_config(self) -> list[str]:
-        """Validate configuration and return list of warnings."""
+        """Validate configuration and return list of warnings.
+
+        Returns:
+            List of warning messages for missing paths or security concerns.
+            Empty list if configuration is valid.
+        """
         warnings = []
 
         if not self.data_dir.exists():

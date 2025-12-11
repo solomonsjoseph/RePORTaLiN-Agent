@@ -36,6 +36,8 @@ See Also
 - :func:`deidentify_dataset` - Main de-identification function
 """
 
+from __future__ import annotations
+
 import base64
 import hashlib
 import json
@@ -610,7 +612,11 @@ class DateShifter:
         self.mm_dd_yyyy_countries = {"US", "PH", "CA"}
 
     def _get_shift_offset(self) -> int:
-        """Get consistent shift offset based on seed."""
+        """Get consistent shift offset based on seed.
+
+        Returns:
+            Integer offset in days (can be negative) within ±shift_range_days.
+        """
         if self._shift_offset is None:
             # Generate deterministic offset from seed
             hash_digest = hashlib.sha256(self.seed.encode()).digest()
@@ -837,10 +843,15 @@ class MappingStore:
         """
         Detect the encryption format of stored data.
 
+        Args:
+            data: Raw bytes read from storage file.
+
         Returns:
-            'aes256gcm': AES-256-GCM format (JSON with 'v', 'n', 'c' fields)
-            'fernet': Fernet format (starts with 'gAAAA')
-            'plaintext': Unencrypted JSON
+            Format identifier string:
+            - 'aes256gcm': AES-256-GCM format (JSON with 'v', 'n', 'c' fields)
+            - 'fernet': Fernet format (starts with 'gAAAA')
+            - 'plaintext': Unencrypted JSON
+            - 'unknown': Unrecognized format
         """
         try:
             # Check for AES-256-GCM format (JSON with version field)
@@ -860,7 +871,11 @@ class MappingStore:
             return "unknown"
 
     def _load_mappings(self) -> None:
-        """Load mappings from storage file."""
+        """Load mappings from storage file.
+
+        Automatically detects encryption format (AES-256-GCM, Fernet, or plaintext)
+        and decrypts accordingly. Sets self.mappings to empty dict on failure.
+        """
         if not self.storage_path.exists():
             return
 
@@ -1670,7 +1685,14 @@ def validate_dataset(
 
 
 def main() -> None:
-    """Command-line interface for de-identification."""
+    """Command-line interface for de-identification.
+
+    Parses command-line arguments and runs the de-identification pipeline.
+    Supports country-specific regulations, encryption options, and validation.
+
+    Returns:
+        None. Exits with status 0 on success.
+    """
     import argparse
 
     parser = argparse.ArgumentParser(

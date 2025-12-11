@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Centralized Logging Module
 ===========================
@@ -77,11 +78,34 @@ See Also
 - Developer Guide: docs/sphinx/developer_guide/architecture.rst (Logging System section)
 """
 
+from __future__ import annotations
+
 import logging
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+__all__ = [
+    # Constants
+    "SUCCESS",
+    # Core functions
+    "setup_logger",
+    "get_logger",
+    "get_log_file_path",
+    # Convenience logging functions
+    "debug",
+    "info",
+    "warning",
+    "error",
+    "critical",
+    "success",
+    # Classes
+    "CustomFormatter",
+    "VerboseLogger",
+    # Verbose logging
+    "get_verbose_logger",
+]
 
 SUCCESS = 25
 logging.addLevelName(SUCCESS, "SUCCESS")
@@ -91,9 +115,21 @@ _log_file_path: str | None = None
 
 
 class CustomFormatter(logging.Formatter):
-    """Custom log formatter that properly handles the SUCCESS log level."""
+    """Custom log formatter that properly handles the SUCCESS log level.
 
-    def format(self, record):
+    Extends the standard Formatter to ensure SUCCESS level records display
+    the correct level name in log output.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format the specified log record.
+
+        Args:
+            record: The log record to format.
+
+        Returns:
+            The formatted log message string.
+        """
         if record.levelno == SUCCESS:
             record.levelname = "SUCCESS"
         return super().format(record)
@@ -162,7 +198,17 @@ def setup_logger(
         console_handler.setFormatter(CustomFormatter("%(levelname)s: %(message)s"))
 
         class SimpleFilter(logging.Filter):
-            """Allow SUCCESS (25), WARNING (30), ERROR (40), and CRITICAL (50)."""
+            """Filter that allows SUCCESS, WARNING, ERROR, and CRITICAL levels.
+
+            This filter passes log records with level SUCCESS (25), WARNING (30),
+            ERROR (40), and CRITICAL (50), blocking DEBUG and INFO messages.
+
+            Args:
+                record: The log record to evaluate.
+
+            Returns:
+                True if the record should be logged, False otherwise.
+            """
 
             def filter(self, record: logging.LogRecord) -> bool:
                 return record.levelno == SUCCESS or record.levelno >= logging.WARNING
@@ -174,7 +220,18 @@ def setup_logger(
         console_handler.setFormatter(CustomFormatter("%(levelname)s: %(message)s"))
 
         class SuccessOrErrorFilter(logging.Filter):
-            """Allow SUCCESS (25), ERROR (40), and CRITICAL (50) but suppress WARNING (30)."""
+            """Filter that allows SUCCESS, ERROR, and CRITICAL but suppresses WARNING.
+
+            This filter passes log records with level SUCCESS (25), ERROR (40),
+            and CRITICAL (50), but blocks WARNING (30) messages along with
+            DEBUG and INFO. Used for default console output to keep terminal clean.
+
+            Args:
+                record: The log record to evaluate.
+
+            Returns:
+                True if the record should be logged, False otherwise.
+            """
 
             def filter(self, record: logging.LogRecord) -> bool:
                 return record.levelno == SUCCESS or record.levelno >= logging.ERROR
@@ -232,54 +289,115 @@ def get_logger(name: str | None = None) -> logging.Logger:
 
 
 def get_log_file_path() -> str | None:
-    """Get the path to the current log file."""
+    """Get the path to the current log file.
+
+    Returns:
+        The absolute path to the log file, or None if logging is not initialized.
+    """
     return _log_file_path
 
 
 def _append_log_path(msg: str, include_log_path: bool) -> str:
-    """Helper function to append log file path to error/warning messages."""
+    """Append log file path to error/warning messages.
+
+    Args:
+        msg: The original message to potentially modify.
+        include_log_path: Whether to append the log file path.
+
+    Returns:
+        The message with optional log file path appended.
+    """
     if include_log_path and get_log_file_path():
         return f"{msg}\nFor more details, check the log file at: {get_log_file_path()}"
     return msg
 
 
 def debug(msg: str, *args: Any, **kwargs: Any) -> None:
-    """Log a DEBUG level message."""
+    """Log a DEBUG level message.
+
+    Args:
+        msg: The message to log.
+        *args: Additional positional arguments passed to the logger.
+        **kwargs: Additional keyword arguments passed to the logger.
+    """
     get_logger().debug(msg, *args, **kwargs)
 
 
 def info(msg: str, *args: Any, **kwargs: Any) -> None:
-    """Log an INFO level message."""
+    """Log an INFO level message.
+
+    Args:
+        msg: The message to log.
+        *args: Additional positional arguments passed to the logger.
+        **kwargs: Additional keyword arguments passed to the logger.
+    """
     get_logger().info(msg, *args, **kwargs)
 
 
 def warning(
     msg: str, *args: Any, include_log_path: bool = False, **kwargs: Any
 ) -> None:
-    """Log a WARNING level message."""
+    """Log a WARNING level message.
+
+    Args:
+        msg: The message to log.
+        *args: Additional positional arguments passed to the logger.
+        include_log_path: Whether to append log file path to message.
+        **kwargs: Additional keyword arguments passed to the logger.
+    """
     get_logger().warning(_append_log_path(msg, include_log_path), *args, **kwargs)
 
 
 def error(msg: str, *args: Any, include_log_path: bool = True, **kwargs: Any) -> None:
-    """Log an ERROR level message with optional log file path."""
+    """Log an ERROR level message with optional log file path.
+
+    Args:
+        msg: The message to log.
+        *args: Additional positional arguments passed to the logger.
+        include_log_path: Whether to append log file path to message.
+        **kwargs: Additional keyword arguments passed to the logger.
+    """
     get_logger().error(_append_log_path(msg, include_log_path), *args, **kwargs)
 
 
 def critical(
     msg: str, *args: Any, include_log_path: bool = True, **kwargs: Any
 ) -> None:
-    """Log a CRITICAL level message with optional log file path."""
+    """Log a CRITICAL level message with optional log file path.
+
+    Args:
+        msg: The message to log.
+        *args: Additional positional arguments passed to the logger.
+        include_log_path: Whether to append log file path to message.
+        **kwargs: Additional keyword arguments passed to the logger.
+    """
     get_logger().critical(_append_log_path(msg, include_log_path), *args, **kwargs)
 
 
 def success(msg: str, *args: Any, **kwargs: Any) -> None:
-    """Log a SUCCESS level message (custom level 25)."""
+    """Log a SUCCESS level message (custom level 25).
+
+    Args:
+        msg: The message to log.
+        *args: Additional positional arguments passed to the logger.
+        **kwargs: Additional keyword arguments passed to the logger.
+    """
     get_logger().log(SUCCESS, msg, *args, **kwargs)
 
 
 # Add success method to Logger class properly
 def _success_method(self: logging.Logger, msg: str, *args: Any, **kwargs: Any) -> None:
-    """Custom success logging method for Logger instances."""
+    """Custom success logging method for Logger instances.
+
+    This method is dynamically added to the Logger class to support
+    the custom SUCCESS level (25) via ``logger.success()`` calls.
+
+    Args:
+        self: The logger instance.
+        msg: The message to log.
+        *args: Additional positional arguments passed to log().
+        **kwargs: Additional keyword arguments passed to log().
+    """
     if self.isEnabledFor(SUCCESS):
         self.log(SUCCESS, msg, *args, **kwargs)
 
@@ -303,23 +421,47 @@ class VerboseLogger:
                 vlog.detail("Details here")
     """
 
-    def __init__(self, logger_module):
-        """Initialize with logger module."""
+    def __init__(self, logger_module) -> None:
+        """Initialize with logger module.
+
+        Args:
+            logger_module: The logging module to use for output (typically
+                ``scripts.utils.logging`` or ``sys.modules[__name__]``).
+        """
         self.log = logger_module
         self._indent = 0
 
     def _is_verbose(self) -> bool:
-        """Check if verbose (DEBUG) logging is enabled."""
+        """Check if verbose (DEBUG) logging is enabled.
+
+        Returns:
+            True if the logger level is DEBUG, False otherwise.
+        """
         return get_logger().level == logging.DEBUG
 
     def _log_tree(self, prefix: str, message: str) -> None:
-        """Log with tree-view formatting."""
+        """Log with tree-view formatting.
+
+        Args:
+            prefix: Tree-view prefix character(s) (e.g., "├─ ", "│  ", "└─ ").
+            message: The message to log.
+        """
         if self._is_verbose():
             indent = "  " * self._indent
             self.log.debug(f"{indent}{prefix}{message}")
 
     class _ContextManager:
-        """Context manager for tree-view logging blocks."""
+        """Context manager for tree-view logging blocks.
+
+        Manages indentation and provides header/footer output for structured
+        tree-view logging of processing steps.
+
+        Args:
+            vlog: The parent VerboseLogger instance.
+            prefix: Tree-view prefix character(s) for the header.
+            header: Message to display on context entry.
+            footer: Optional message to display on context exit.
+        """
 
         def __init__(
             self,
@@ -347,30 +489,65 @@ class VerboseLogger:
     def file_processing(
         self, filename: str, total_records: int | None = None
     ) -> _ContextManager:
-        """Context manager for processing a file."""
+        """Context manager for processing a file.
+
+        Args:
+            filename: Name of the file being processed.
+            total_records: Optional total number of records in the file.
+
+        Returns:
+            A context manager that logs file processing start/end.
+        """
         header = f"Processing: {filename}"
         if total_records is not None:
             header += f" ({total_records} records)"
         return self._ContextManager(self, "├─ ", header, "✓ Complete")
 
-    def step(self, step_name: str):
-        """Context manager for a processing step."""
+    def step(self, step_name: str) -> _ContextManager:
+        """Context manager for a processing step.
+
+        Args:
+            step_name: Name of the processing step.
+
+        Returns:
+            A context manager that logs step start.
+        """
         return self._ContextManager(self, "├─ ", step_name)
 
     def detail(self, message: str) -> None:
-        """Log a detail message within a step."""
+        """Log a detail message within a step.
+
+        Args:
+            message: The detail message to log.
+        """
         self._log_tree("│  ", message)
 
     def metric(self, label: str, value: Any) -> None:
-        """Log a metric/statistic."""
+        """Log a metric/statistic.
+
+        Args:
+            label: The metric label.
+            value: The metric value.
+        """
         self._log_tree("├─ ", f"{label}: {value}")
 
     def timing(self, operation: str, seconds: float) -> None:
-        """Log operation timing."""
+        """Log operation timing.
+
+        Args:
+            operation: Name of the timed operation.
+            seconds: Duration in seconds.
+        """
         self._log_tree("├─ ", f"⏱ {operation}: {seconds:.2f}s")
 
     def items_list(self, label: str, items: list, max_show: int = 5) -> None:
-        """Log a list of items with truncation if too long."""
+        """Log a list of items with truncation if too long.
+
+        Args:
+            label: Label for the list.
+            items: List of items to display.
+            max_show: Maximum number of items to show before truncating.
+        """
         if not self._is_verbose():
             return
 
@@ -387,7 +564,11 @@ _verbose_logger: VerboseLogger | None = None
 
 
 def get_verbose_logger() -> VerboseLogger:
-    """Get or create the global VerboseLogger instance."""
+    """Get or create the global VerboseLogger instance.
+
+    Returns:
+        The singleton VerboseLogger instance for tree-view logging.
+    """
     global _verbose_logger
     if _verbose_logger is None:
         _verbose_logger = VerboseLogger(sys.modules[__name__])

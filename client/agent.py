@@ -93,17 +93,14 @@ __all__ = [
 
 class AgentError(Exception):
     """Base exception for agent errors."""
-    pass
 
 
 class AgentConfigError(AgentError):
-    """Raised when agent configuration is invalid."""
-    pass
+    """Raised when agent configuration is invalid or missing required values."""
 
 
 class AgentExecutionError(AgentError):
-    """Raised when agent execution fails."""
-    pass
+    """Raised when agent execution fails during the ReAct loop."""
 
 
 # =============================================================================
@@ -421,7 +418,11 @@ class MCPAgent:
         print("👋 Agent disconnected")
 
     def _ensure_connected(self) -> None:
-        """Verify agent is connected."""
+        """Verify agent is connected.
+
+        Raises:
+            AgentError: If agent is not connected.
+        """
         if not self._connected:
             raise AgentError("Agent not connected. Call connect() first.")
 
@@ -634,12 +635,12 @@ class MCPAgent:
         ]
         print("🔄 Conversation reset")
 
-    def get_conversation_history(self) -> list[dict[str, Any]]:
+    def get_conversation_history(self) -> list[ChatCompletionMessageParam]:
         """
         Get the current conversation history.
 
         Returns:
-            Copy of the messages list
+            Copy of the messages list for inspection or serialization.
         """
         return list(self.messages)
 
@@ -694,7 +695,7 @@ async def main() -> int:
         uv run python -m client.agent  # Uses default test prompt
 
     Returns:
-        Exit code (0 for success, 1 for error)
+        Exit code: 0 for success, 1 for error.
     """
     # Get prompt from command line args or use default
     if len(sys.argv) > 1:

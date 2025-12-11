@@ -30,6 +30,8 @@ See Also
 - :func:`process_excel_file` - Process individual Excel files
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -106,19 +108,46 @@ def clean_record_for_json(record: dict) -> dict:
 
 
 def find_excel_files(directory: str) -> list[Path]:
-    """Find all Excel files (.xlsx) in the specified directory."""
+    """Find all Excel files (.xlsx) in the specified directory.
+
+    Args:
+        directory: Path to directory to search for Excel files.
+
+    Returns:
+        List of Path objects for each .xlsx file found.
+    """
     return list(Path(directory).glob("*.xlsx"))
 
 
 def is_dataframe_empty(df: pd.DataFrame) -> bool:
-    """Check if DataFrame is completely empty (no rows AND no columns)."""
+    """Check if DataFrame is completely empty (no rows AND no columns).
+
+    Args:
+        df: pandas DataFrame to check.
+
+    Returns:
+        True if DataFrame has zero rows and zero columns, False otherwise.
+    """
     return len(df.columns) == 0 and len(df) == 0
 
 
 def convert_dataframe_to_jsonl(
     df: pd.DataFrame, output_file: Path, source_filename: str
 ) -> int:
-    """Convert DataFrame to JSONL format, handling empty DataFrames with column metadata."""
+    """Convert DataFrame to JSONL format, handling empty DataFrames with column metadata.
+
+    Args:
+        df: pandas DataFrame to convert.
+        output_file: Path where JSONL file will be written.
+        source_filename: Original filename to include in each record's metadata.
+
+    Returns:
+        Number of records written to the output file.
+
+    Note:
+        If DataFrame has columns but no rows, writes a single metadata record
+        containing the column structure for reference.
+    """
     with open(output_file, "w", encoding="utf-8") as f:
         if len(df) == 0 and len(df.columns) > 0:
             # Create record with explicit type for proper type checking
@@ -144,7 +173,19 @@ def convert_dataframe_to_jsonl(
 def process_excel_file(
     excel_file: Path, output_dir: str
 ) -> tuple[bool, int, str | None]:
-    """Process Excel file to JSONL format, creating both original and cleaned versions."""
+    """Process Excel file to JSONL format, creating both original and cleaned versions.
+
+    Args:
+        excel_file: Path to the Excel file to process.
+        output_dir: Directory where output JSONL files will be written.
+                   Creates 'original/' and 'cleaned/' subdirectories.
+
+    Returns:
+        Tuple of (success, record_count, error_message):
+        - success: True if processing completed successfully
+        - record_count: Number of records extracted (0 if failed or empty)
+        - error_message: Error description if failed, None otherwise
+    """
     start_time = time.time()
     try:
         # Create separate directories for original and cleaned files
@@ -267,7 +308,18 @@ def clean_duplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def check_file_integrity(file_path: Path) -> bool:
-    """Check if JSONL file is valid and readable."""
+    """Check if JSONL file is valid and readable.
+
+    Verifies that the file exists, is non-empty, and contains valid JSON
+    with at least one properly-structured record.
+
+    Args:
+        file_path: Path to the JSONL file to validate.
+
+    Returns:
+        True if file is valid (exists, non-empty, valid JSON dict on first line),
+        False otherwise.
+    """
     try:
         if not file_path.exists() or file_path.stat().st_size == 0:
             return False
@@ -286,8 +338,18 @@ def extract_excel_to_jsonl() -> dict[str, Any]:
     """
     Extract all Excel files from dataset directory, creating original and cleaned JSONL versions.
 
+    Processes all .xlsx files from `config.DATASET_DIR`, creating two versions of each:
+    - ``original/``: Direct conversion with all columns preserved
+    - ``cleaned/``: Duplicate columns (SUBJID2, SUBJID3, etc.) removed
+
     Returns:
-        Dictionary with extraction statistics
+        Dictionary with extraction statistics containing:
+        - files_found: Total Excel files discovered
+        - files_created: Number of JSONL files successfully created
+        - files_skipped: Files skipped (valid output already exists)
+        - total_records: Total records processed across all files
+        - errors: List of error messages for failed files
+        - processing_time: Total elapsed time in seconds
     """
     overall_start = time.time()
     os.makedirs(config.CLEAN_DATASET_DIR, exist_ok=True)

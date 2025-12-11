@@ -13,6 +13,28 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, TypeAlias
 
+__all__ = [
+    # JSON Types
+    "JsonPrimitive",
+    "JsonArray",
+    "JsonObject",
+    "JsonValue",
+    # Enums
+    "TransportType",
+    "LogLevel",
+    "PrivacyMode",
+    "EnvironmentType",
+    # Dataclasses
+    "ToolResult",
+    "ServerCapabilities",
+    "SecurityContext",
+    # Type Aliases
+    "ToolName",
+    "ResourceUri",
+    "PromptId",
+    "SessionId",
+]
+
 # JSON-compatible types (JSON-RPC 2.0 compliant)
 JsonPrimitive: TypeAlias = str | int | float | bool | None
 JsonArray: TypeAlias = list["JsonValue"]
@@ -74,7 +96,12 @@ class ToolResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> JsonObject:
-        """Convert to JSON-serializable dictionary."""
+        """Convert to JSON-serializable dictionary.
+
+        Returns:
+            A dictionary containing success status, data, error, and metadata
+            fields. Only non-None/non-empty fields are included.
+        """
         result: JsonObject = {"success": self.success}
         if self.data is not None:
             result["data"] = self.data

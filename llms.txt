@@ -1,0 +1,34 @@
+# RePORTaLiN-Specialist
+
+> Privacy-preserving clinical data pipeline with MCP server for secure LLM integration. Provides PHI/PII de-identification, k-anonymity protected statistics, and encrypted audit logging for healthcare data processing.
+
+## Tool Selection Guide
+
+**DEFAULT: Use `combined_search` for ALL queries unless specifically asking about variable definitions.**
+
+- For ANY analytical question → `combined_search`
+- For counts, statistics, distributions → `combined_search`  
+- For "how many", "what percentage" → `combined_search`
+- ONLY for "what variables exist?" → `search_data_dictionary`
+
+## Documentation
+
+- [README](README.md): Project overview, quick start, and MCP tools reference
+- [MCP Server Setup](docs/MCP_SERVER_SETUP.md): Claude Desktop integration guide
+- [Configuration](docs/CONFIGURATION.md): Environment variables and settings reference
+- [Logging Architecture](docs/LOGGING_ARCHITECTURE.md): Encrypted audit logging design
+
+## Security
+
+- [Security Policy](SECURITY.md): PHI handling, compliance, vulnerability reporting
+- [Contributing](CONTRIBUTING.md): Development guidelines and PHI handling rules
+
+## Configuration
+
+- [Environment Template](.env.example): Environment variable template
+- [Claude Desktop Config](claude_desktop_config.example.json): MCP server configuration example
+
+## Optional
+
+- [Changelog](CHANGELOG.md): Version history and release notes
+- [License](LICENSE): MIT License terms

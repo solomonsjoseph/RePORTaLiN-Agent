@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 AES-256-GCM Authenticated Encryption Module.
 
@@ -54,11 +55,20 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 __all__ = [
+    # Classes
     "AES256GCMCipher",
-    "DecryptionError",
     "EncryptedPayload",
+    # Exceptions
+    "DecryptionError",
     "EncryptionError",
+    # Functions
     "derive_key_from_password",
+    # Constants (for advanced users)
+    "AES_256_KEY_SIZE",
+    "GCM_NONCE_SIZE",
+    "GCM_TAG_SIZE",
+    "PBKDF2_ITERATIONS",
+    "PBKDF2_SALT_SIZE",
 ]
 
 
@@ -87,32 +97,50 @@ PBKDF2_SALT_SIZE = 32
 # =============================================================================
 
 class EncryptionError(Exception):
-    """
-    Raised when encryption fails.
+    """Raised when encryption fails.
 
-    This can occur due to:
-    - Invalid key length
-    - System entropy exhaustion (rare)
-    - Memory allocation failure
+    This exception indicates a failure during the encryption process.
+
+    Possible Causes:
+        - Invalid key length (must be exactly 32 bytes for AES-256)
+        - System entropy exhaustion (rare)
+        - Memory allocation failure
+        - Invalid base64 key encoding
+
+    Example:
+        >>> try:
+        ...     cipher = AES256GCMCipher(b"short_key")
+        ... except EncryptionError as e:
+        ...     print(f"Encryption setup failed: {e}")
     """
+
     pass
 
 
 class DecryptionError(Exception):
-    """
-    Raised when decryption fails.
+    """Raised when decryption fails.
 
-    This can occur due to:
-    - Invalid ciphertext format
-    - Authentication tag mismatch (tampering detected)
-    - Wrong key used for decryption
-    - Corrupted data
+    This exception indicates a failure during the decryption process.
+
+    Possible Causes:
+        - Invalid ciphertext format
+        - Authentication tag mismatch (tampering detected)
+        - Wrong key used for decryption
+        - Corrupted data
+        - Unsupported encryption version
 
     Security Note:
         This exception intentionally provides minimal information
         to prevent oracle attacks. The actual cause is logged
         server-side but not exposed to callers.
+
+    Example:
+        >>> try:
+        ...     plaintext = cipher.decrypt(corrupted_data)
+        ... except DecryptionError:
+        ...     print("Decryption failed - data may be corrupted or tampered")
     """
+
     pass
 
 
@@ -149,11 +177,10 @@ class EncryptedPayload:
     timestamp: float = field(default_factory=time.time)
 
     def to_bytes(self) -> bytes:
-        """
-        Serialize to bytes for storage.
+        """Serialize to bytes for storage.
 
         Returns:
-            UTF-8 encoded JSON with base64 binary fields
+            UTF-8 encoded JSON with base64-encoded binary fields.
         """
         payload = {
             "v": self.version,
@@ -165,17 +192,16 @@ class EncryptedPayload:
 
     @classmethod
     def from_bytes(cls, data: bytes) -> EncryptedPayload:
-        """
-        Deserialize from bytes.
+        """Deserialize from bytes.
 
         Args:
-            data: UTF-8 encoded JSON payload
+            data: UTF-8 encoded JSON payload.
 
         Returns:
-            EncryptedPayload instance
+            EncryptedPayload instance with decoded fields.
 
         Raises:
-            DecryptionError: If payload format is invalid
+            DecryptionError: If payload format is invalid or malformed.
         """
         try:
             payload = json.loads(data.decode("utf-8"))
@@ -474,32 +500,40 @@ class AES256GCMCipher:
             raise DecryptionError("Decryption failed - invalid key or corrupted data")
 
     def encrypt_string(self, plaintext: str) -> str:
-        """
-        Convenience method to encrypt a string and return base64.
+        """Convenience method to encrypt a string and return base64.
 
         Args:
-            plaintext: UTF-8 string to encrypt
+            plaintext: UTF-8 string to encrypt.
 
         Returns:
-            Base64-encoded encrypted payload
+            Base64-encoded encrypted payload string.
+
+        Raises:
+            EncryptionError: If encryption fails.
         """
         payload = self.encrypt(plaintext.encode("utf-8"))
         return base64.b64encode(payload.to_bytes()).decode("ascii")
 
     def decrypt_string(self, ciphertext_b64: str) -> str:
-        """
-        Convenience method to decrypt a base64 string.
+        """Convenience method to decrypt a base64 string.
 
         Args:
-            ciphertext_b64: Base64-encoded encrypted payload
+            ciphertext_b64: Base64-encoded encrypted payload.
 
         Returns:
-            Decrypted UTF-8 string
+            Decrypted UTF-8 string.
+
+        Raises:
+            DecryptionError: If decryption fails.
         """
         payload_bytes = base64.b64decode(ciphertext_b64)
         plaintext = self.decrypt(payload_bytes)
         return plaintext.decode("utf-8")
 
     def __repr__(self) -> str:
-        """Safe repr that doesn't expose the key."""
+        """Return safe representation that doesn't expose the key.
+
+        Returns:
+            String representation with truncated key hash.
+        """
         return f"<AES256GCMCipher key_hash={hash(self._key) & 0xFFFF:04x}>"

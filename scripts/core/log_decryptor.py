@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Secure Log Decryption Utility for Developers/Maintainers.
 
@@ -38,6 +39,14 @@ See Also:
 
 from __future__ import annotations
 
+__all__ = [
+    "AuthorizationError",
+    "DecryptionError",
+    "LogDecryptor",
+    "generate_keypair",
+    "main",
+]
+
 import argparse
 import base64
 import datetime
@@ -61,13 +70,21 @@ except ImportError:
 
 
 class DecryptionError(Exception):
-    """Raised when log decryption fails."""
+    """Raised when log decryption fails.
+
+    This may occur due to corrupted files, invalid encryption format,
+    wrong key, or missing cryptography dependencies.
+    """
 
     pass
 
 
 class AuthorizationError(Exception):
-    """Raised when key is not authorized for decryption."""
+    """Raised when key is not authorized for decryption.
+
+    The key fingerprint must be in the authorized_fingerprints list
+    to decrypt logs. Contact your security administrator to add new keys.
+    """
 
     pass
 
@@ -127,7 +144,17 @@ class LogDecryptor:
         key_pem: bytes | None,
         password: str | None,
     ) -> None:
-        """Load and validate the RSA private key."""
+        """Load and validate the RSA private key.
+
+        Args:
+            key_path: Path to PEM-encoded private key file.
+            key_pem: Raw PEM bytes (alternative to file path).
+            password: Password for encrypted private key.
+
+        Raises:
+            FileNotFoundError: If key_path specified but file not found.
+            ValueError: If no key source provided and env var not set.
+        """
         password_bytes = password.encode() if password else None
 
         if key_pem:
@@ -173,7 +200,15 @@ class LogDecryptor:
         self.key_fingerprint = hashlib.sha256(public_bytes).hexdigest()
 
     def _verify_authorization(self) -> None:
-        """Verify the key is authorized for decryption."""
+        """Verify the key is authorized for decryption.
+
+        Raises:
+            AuthorizationError: If key fingerprint not in authorized list.
+
+        Note:
+            If authorized_fingerprints is None, authorization check is
+            skipped (development mode).
+        """
         if self.authorized_fingerprints is None:
             # No authorization list - development mode
             return
@@ -413,7 +448,14 @@ def generate_keypair(
 
 
 def main() -> None:
-    """CLI entry point for log decryption."""
+    """CLI entry point for log decryption.
+
+    Parses command-line arguments and executes the appropriate action:
+    key generation, fingerprint display, or log decryption.
+
+    Returns:
+        None. Exits with status 1 on error.
+    """
     parser = argparse.ArgumentParser(
         description="Decrypt encrypted log files for authorized developers.",
         formatter_class=argparse.RawDescriptionHelpFormatter,

@@ -92,10 +92,24 @@ tmp/
 data/.backup/
 *.tmp
 *.temp
-*.txt
+plan/
 
 # Encrypted audit logs (regenerated, contain session data)
 encrypted_logs/*.enc
+
+# ============================================================================
+# 4a. Project Temporary Files (CRITICAL - DO NOT COMMIT)
+# ============================================================================
+# Temporary working directory
+/tmp/
+tmp/**
+
+# Results output directory (regenerated, may contain sensitive data)
+/results/dataset/
+/results/data_dictionary_mappings/
+
+# Claude desktop config (user-specific)
+claude_desktop_config.json
 
 # ============================================================================
 # 5. Operating Systems

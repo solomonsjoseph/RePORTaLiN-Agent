@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Structured Logging Module with JSON Output and Context Support.
 
@@ -110,7 +111,14 @@ PHI_PATTERNS: frozenset[str] = frozenset(
 
 
 def _is_phi_key(key: str) -> bool:
-    """Check if a key potentially contains PHI based on naming patterns."""
+    """Check if a key potentially contains PHI based on naming patterns.
+
+    Args:
+        key: Dictionary key name to check.
+
+    Returns:
+        True if the key matches known PHI patterns, False otherwise.
+    """
     key_lower = key.lower().replace("_", "").replace("-", "")
     return any(pattern in key_lower for pattern in PHI_PATTERNS)
 
@@ -119,11 +127,12 @@ def _redact_phi(data: dict[str, Any], redact: bool = True) -> dict[str, Any]:
     """Redact PHI values from a dictionary.
 
     Args:
-        data: Dictionary potentially containing PHI
-        redact: Whether to apply redaction
+        data: Dictionary potentially containing PHI.
+        redact: Whether to apply redaction (pass False to skip).
 
     Returns:
-        Dictionary with PHI values replaced with [REDACTED]
+        Dictionary with PHI values replaced with '[REDACTED]'.
+        Nested dictionaries are processed recursively.
     """
     if not redact:
         return data
@@ -175,7 +184,14 @@ class JSONFormatter(logging.Formatter):
         self.indent = indent
 
     def format(self, record: logging.LogRecord) -> str:
-        """Format log record as JSON."""
+        """Format log record as JSON.
+
+        Args:
+            record: Python logging LogRecord to format.
+
+        Returns:
+            JSON-encoded string representation of the log entry.
+        """
         # Build base log entry
         log_entry: dict[str, Any] = {
             "level": record.levelname,
@@ -363,28 +379,44 @@ class BoundLogger:
 
     Created by StructuredLogger.bind() to provide context that
     is automatically included in all log calls.
+
+    Attributes:
+        _logger: Parent StructuredLogger instance.
+        _context: Bound context dictionary.
     """
 
     def __init__(self, logger: StructuredLogger, context: dict[str, Any]) -> None:
+        """Initialize bound logger.
+
+        Args:
+            logger: Parent StructuredLogger to delegate to.
+            context: Context dictionary to include in all log calls.
+        """
         self._logger = logger
         self._context = context
 
     def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Log DEBUG message with bound context."""
         self._logger.debug(msg, *args, **{**self._context, **kwargs})
 
     def info(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Log INFO message with bound context."""
         self._logger.info(msg, *args, **{**self._context, **kwargs})
 
     def warning(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Log WARNING message with bound context."""
         self._logger.warning(msg, *args, **{**self._context, **kwargs})
 
     def error(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Log ERROR message with bound context."""
         self._logger.error(msg, *args, **{**self._context, **kwargs})
 
     def critical(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Log CRITICAL message with bound context."""
         self._logger.critical(msg, *args, **{**self._context, **kwargs})
 
     def exception(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Log ERROR message with exception info and bound context."""
         self._logger.exception(msg, *args, **{**self._context, **kwargs})
 
     def bind(self, **kwargs: Any) -> BoundLogger:
@@ -396,7 +428,8 @@ def get_current_context() -> dict[str, Any]:
     """Get the current log context from context variable or thread-local.
 
     Returns:
-        Current context dictionary (empty if no context set)
+        Current context dictionary. Falls back to thread-local storage
+        for non-async contexts. Returns empty dict if no context is set.
     """
     try:
         return _log_context.get()
@@ -409,7 +442,10 @@ def set_context(**kwargs: Any) -> None:
     """Set values in the current log context.
 
     Args:
-        **kwargs: Context key-value pairs to set
+        **kwargs: Context key-value pairs to set.
+
+    Returns:
+        None. Context is updated in-place.
     """
     current = get_current_context().copy()
     current.update(kwargs)
@@ -418,7 +454,11 @@ def set_context(**kwargs: Any) -> None:
 
 
 def clear_context() -> None:
-    """Clear the current log context."""
+    """Clear the current log context.
+
+    Returns:
+        None. Both context variable and thread-local are reset to empty.
+    """
     _log_context.set({})
     _thread_context.context = {}
 
@@ -544,5 +584,12 @@ def configure_logging(
 
 # Convenience function for importing
 def setup_structured_logging(**kwargs: Any) -> None:
-    """Alias for configure_logging for backwards compatibility."""
+    """Alias for configure_logging for backwards compatibility.
+
+    Args:
+        **kwargs: All arguments are passed to configure_logging().
+
+    Returns:
+        None.
+    """
     configure_logging(**kwargs)

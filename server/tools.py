@@ -1,12 +1,18 @@
 """
 MCP Tool Definitions for RePORTaLiN.
 
-This module implements 4 secure tools for clinical data analysis:
+This module implements 10 secure tools for clinical data analysis:
 
 1. search_data_dictionary - Search variable definitions, codelists, metadata
 2. search_cleaned_dataset - Query de-identified cleaned data (aggregates only)
 3. search_original_dataset - Query de-identified original data (aggregates only)
 4. combined_search - Cross-reference dictionary with dataset for accurate answers
+5. cross_tabulation - Analyze relationships between two variables
+6. cohort_summary - Get comprehensive study overview
+7. natural_language_query - Answer complex multi-concept questions
+8. variable_details - Get comprehensive info about ONE specific variable
+9. data_quality_report - Analyze missing data and completeness
+10. multi_variable_comparison - Compare multiple variables side-by-side
 
 Security Model:
     - NEVER expose raw data values or individual records
@@ -171,7 +177,12 @@ mcp = FastMCP(
 # =============================================================================
 
 def load_data_dictionary() -> dict[str, list[dict]]:
-    """Load all data dictionary JSONL files."""
+    """Load all data dictionary JSONL files.
+
+    Returns:
+        Dictionary mapping table names to lists of field definition records.
+        Empty dict if path doesn't exist or no files found.
+    """
     all_data: dict[str, list[dict]] = {}
     
     if not DATA_DICTIONARY_PATH.exists():
@@ -196,7 +207,12 @@ def load_data_dictionary() -> dict[str, list[dict]]:
 
 
 def load_codelists() -> dict[str, list[dict]]:
-    """Load all codelist definitions."""
+    """Load all codelist definitions.
+
+    Returns:
+        Dictionary mapping codelist names to lists of code/descriptor records.
+        Empty dict if codelist path doesn't exist.
+    """
     codelists: dict[str, list[dict]] = {}
     codelist_path = DATA_DICTIONARY_PATH / "Codelists"
     
@@ -222,7 +238,15 @@ def load_codelists() -> dict[str, list[dict]]:
 
 
 def load_dataset(path: Path) -> dict[str, list[dict]]:
-    """Load dataset from a directory of JSONL files."""
+    """Load dataset from a directory of JSONL files.
+
+    Args:
+        path: Directory path containing JSONL files.
+
+    Returns:
+        Dictionary mapping table names (file stems) to lists of records.
+        Empty dict if path doesn't exist.
+    """
     dataset: dict[str, list[dict]] = {}
     
     if not path.exists():
@@ -257,7 +281,11 @@ _original_cache: dict[str, list[dict]] | None = None
 
 
 def get_data_dictionary() -> dict[str, list[dict]]:
-    """Get cached data dictionary."""
+    """Get cached data dictionary.
+
+    Returns:
+        Dictionary mapping table names to field definitions.
+    """
     global _dict_cache
     if _dict_cache is None:
         _dict_cache = load_data_dictionary()
@@ -265,7 +293,11 @@ def get_data_dictionary() -> dict[str, list[dict]]:
 
 
 def get_codelists() -> dict[str, list[dict]]:
-    """Get cached codelists."""
+    """Get cached codelists.
+
+    Returns:
+        Dictionary mapping codelist names to code/descriptor records.
+    """
     global _codelist_cache
     if _codelist_cache is None:
         _codelist_cache = load_codelists()
@@ -273,7 +305,11 @@ def get_codelists() -> dict[str, list[dict]]:
 
 
 def get_cleaned_dataset() -> dict[str, list[dict]]:
-    """Get cached cleaned dataset."""
+    """Get cached cleaned dataset.
+
+    Returns:
+        Dictionary mapping table names to de-identified records.
+    """
     global _cleaned_cache
     if _cleaned_cache is None:
         _cleaned_cache = load_dataset(CLEANED_DATA_PATH)
@@ -281,7 +317,11 @@ def get_cleaned_dataset() -> dict[str, list[dict]]:
 
 
 def get_original_dataset() -> dict[str, list[dict]]:
-    """Get cached original dataset."""
+    """Get cached original dataset.
+
+    Returns:
+        Dictionary mapping table names to original de-identified records.
+    """
     global _original_cache
     if _original_cache is None:
         _original_cache = load_dataset(ORIGINAL_DATA_PATH)
@@ -295,8 +335,16 @@ def get_original_dataset() -> dict[str, list[dict]]:
 def compute_variable_stats(records: list[dict], variable: str) -> dict[str, Any]:
     """
     Compute SAFE aggregate statistics for a variable.
-    
+
     Returns counts, distributions - NEVER raw values.
+
+    Args:
+        records: List of data records to analyze.
+        variable: Variable/field name to compute statistics for.
+
+    Returns:
+        Dictionary with aggregate statistics including type, counts,
+        and either numeric statistics or categorical value counts.
     """
     values = [r.get(variable) for r in records if r.get(variable) is not None]
     
@@ -351,7 +399,15 @@ def compute_variable_stats(records: list[dict], variable: str) -> dict[str, Any]
 
 
 def compute_histogram(values: list[float], bins: int = 10) -> list[dict]:
-    """Compute histogram bins for numeric data."""
+    """Compute histogram bins for numeric data.
+
+    Args:
+        values: List of numeric values to bin.
+        bins: Number of histogram bins (default: 10).
+
+    Returns:
+        List of dicts with 'range' and 'count' keys for each bin.
+    """
     if not values:
         return []
     
@@ -378,7 +434,15 @@ def compute_histogram(values: list[float], bins: int = 10) -> list[dict]:
 
 
 def find_variable_in_dataset(dataset: dict[str, list[dict]], variable: str) -> list[tuple[str, list[dict]]]:
-    """Find which tables contain a variable."""
+    """Find which tables contain a variable.
+
+    Args:
+        dataset: Dataset dictionary mapping table names to records.
+        variable: Variable name to search for (case-insensitive partial match).
+
+    Returns:
+        List of tuples containing (table_name, matched_key, records) for each match.
+    """
     matches = []
     var_lower = variable.lower()
     

@@ -9,6 +9,39 @@ Updated: December 2025 - MCP Protocol 2025-03-26 compliance
 
 from __future__ import annotations
 
+__all__ = [
+    # Server identification
+    "SERVER_NAME",
+    "SERVER_VERSION",
+    "PROTOCOL_VERSION",
+    # Transport defaults
+    "DEFAULT_TRANSPORT",
+    "DEFAULT_HOST",
+    "DEFAULT_PORT",
+    # Security constants
+    "MIN_K_ANONYMITY",
+    "MAX_RESULTS_PER_QUERY",
+    "AUDIT_LOG_RETENTION_DAYS",
+    # Timeouts
+    "REQUEST_TIMEOUT",
+    "SHUTDOWN_TIMEOUT",
+    "SSE_KEEPALIVE_INTERVAL",
+    # Rate limiting
+    "DEFAULT_RATE_LIMIT_RPM",
+    "DEFAULT_RATE_LIMIT_BURST",
+    # File paths
+    "DATA_DICTIONARY_PATH",
+    "ENCRYPTED_LOGS_PATH",
+    # Environment variables
+    "ENV_LOG_LEVEL",
+    "ENV_TRANSPORT",
+    "ENV_HOST",
+    "ENV_PORT",
+    # Security
+    "TOKEN_ROTATION_GRACE_PERIOD_SECONDS",
+    "ENCRYPTION_KEY_ROTATION_DAYS",
+]
+
 # Server identification
 SERVER_NAME = "reportalin-mcp"
 SERVER_VERSION = "2.1.0"

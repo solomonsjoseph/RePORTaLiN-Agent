@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 RePORTaLiN-Specialist Utilities Package.
 
@@ -15,6 +16,8 @@ Usage:
         success("Processing complete!")
 """
 
+from __future__ import annotations
+
 from __version__ import __version__
 
 from .logging import (
@@ -30,6 +33,7 @@ from .logging import (
 )
 
 __all__ = [
+    "__version__",
     "critical",
     "debug",
     "error",

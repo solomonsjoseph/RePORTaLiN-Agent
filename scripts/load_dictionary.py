@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Data Dictionary Loader Module
 ==============================
@@ -51,6 +52,8 @@ See Also
 - :mod:`scripts.extract_data` - For dataset extraction
 """
 
+from __future__ import annotations
+
 __all__ = ["load_study_dictionary", "process_excel_file"]
 
 import os
@@ -93,10 +96,15 @@ def _split_sheet_into_tables(df: pd.DataFrame) -> list[pd.DataFrame]:
     Split DataFrame into multiple tables based on empty row/column boundaries.
 
     Args:
-        df: DataFrame to split into separate tables
+        df: DataFrame to split into separate tables.
 
     Returns:
-        List of DataFrames, each representing a detected table
+        List of DataFrames, each representing a detected table.
+
+    Note:
+        Uses a two-pass algorithm: first splits by empty rows into horizontal
+        strips, then splits each strip by empty columns into individual tables.
+        Empty tables (all NaN) are filtered out.
     """
     empty_rows = df.index[df.isnull().all(axis=1)].tolist()
     row_boundaries = [-1, *empty_rows, df.shape[0]]
@@ -129,9 +137,17 @@ def _process_and_save_tables(
     Process detected tables, apply filters, add metadata, and save to JSONL files.
 
     Args:
-        all_tables: List of DataFrames representing detected tables
-        sheet_name: Name of the Excel sheet being processed
-        output_dir: Directory where JSONL files will be saved
+        all_tables: List of DataFrames representing detected tables.
+        sheet_name: Name of the Excel sheet being processed.
+        output_dir: Directory where JSONL files will be saved.
+
+    Returns:
+        None. Files are written to disk as a side effect.
+
+    Note:
+        Tables following an "ignore below" marker are saved to an 'extraas/'
+        subdirectory. Each table receives ``__sheet__`` and ``__table__``
+        metadata fields.
     """
     folder_name = "".join(c for c in sheet_name if c.isalnum() or c in "._- ").strip()
     sheet_dir = os.path.join(output_dir, folder_name)
