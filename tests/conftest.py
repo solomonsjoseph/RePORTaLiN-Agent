@@ -17,7 +17,7 @@ Usage:
 
         def test_example(settings):
             assert settings.log_level is not None
-        
+
         @pytest.mark.asyncio
         async def test_auth(test_client, test_token):
             response = test_client.get("/health")
@@ -32,12 +32,10 @@ See Also:
 from __future__ import annotations
 
 import asyncio
-import os
 import sys
 import tempfile
-from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
-from typing import TYPE_CHECKING, AsyncGenerator, Generator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -65,9 +63,12 @@ EMPTY_TOKEN = ""
 # Pytest Configuration
 # =============================================================================
 
+
 def pytest_configure(config: pytest.Config) -> None:
     """Configure pytest with custom markers."""
-    config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
+    config.addinivalue_line(
+        "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
+    )
     config.addinivalue_line("markers", "integration: marks tests as integration tests")
     config.addinivalue_line("markers", "security: marks tests as security-related")
     config.addinivalue_line("markers", "mcp: marks tests as MCP server tests")
@@ -78,37 +79,41 @@ def pytest_configure(config: pytest.Config) -> None:
 def reset_caches():
     """
     Autouse fixture to reset caches before each test.
-    
+
     This ensures that:
     1. Settings cache is cleared so env vars can be changed per-test
     2. Rotatable secret cache is cleared so auth state is fresh
-    
+
     This prevents test pollution where one test's cache affects another.
     """
     # Import and clear caches BEFORE test runs
     try:
         from server.config import get_settings
+
         get_settings.cache_clear()
     except ImportError:
         pass
-    
+
     try:
         from server.auth import get_rotatable_secret
+
         get_rotatable_secret.cache_clear()
     except ImportError:
         pass
-    
+
     yield  # Test runs here
-    
+
     # Clear caches AFTER test as well (cleanup)
     try:
         from server.config import get_settings
+
         get_settings.cache_clear()
     except ImportError:
         pass
-    
+
     try:
         from server.auth import get_rotatable_secret
+
         get_rotatable_secret.cache_clear()
     except ImportError:
         pass
@@ -118,11 +123,12 @@ def reset_caches():
 # Session-Scoped Fixtures (created once per test session)
 # =============================================================================
 
+
 @pytest.fixture(scope="session")
 def event_loop():
     """
     Create an event loop for the test session.
-    
+
     This fixture provides a shared event loop for all async tests,
     ensuring proper cleanup at session end.
     """
@@ -153,14 +159,15 @@ def results_dir(project_root: Path) -> Path:
 # Module-Scoped Fixtures (created once per test module)
 # =============================================================================
 
+
 @pytest.fixture(scope="module")
 def test_token() -> str:
     """
     Get the known test authentication token.
-    
+
     This token is used for tests that require valid authentication.
     It's set via environment variable override in the app_settings fixture.
-    
+
     Returns:
         The test authentication token string
     """
@@ -171,10 +178,10 @@ def test_token() -> str:
 def app_settings(monkeypatch_module):
     """
     Override application settings for testing.
-    
+
     Sets MCP_AUTH_TOKEN to a known value for predictable auth testing.
     Also enables auth to ensure security tests work correctly.
-    
+
     Returns:
         Settings instance with test configuration
     """
@@ -183,11 +190,12 @@ def app_settings(monkeypatch_module):
     monkeypatch_module.setenv("MCP_AUTH_ENABLED", "true")
     monkeypatch_module.setenv("ENVIRONMENT", "local")
     monkeypatch_module.setenv("LOG_LEVEL", "DEBUG")
-    
+
     # Clear the settings cache to pick up new values
     from server.config import get_settings
+
     get_settings.cache_clear()
-    
+
     settings = get_settings()
     return settings
 
@@ -196,11 +204,12 @@ def app_settings(monkeypatch_module):
 def monkeypatch_module():
     """
     Module-scoped monkeypatch fixture.
-    
+
     Pytest's monkeypatch is function-scoped by default.
     This provides module-scoped environment patching for settings.
     """
     from _pytest.monkeypatch import MonkeyPatch
+
     mp = MonkeyPatch()
     yield mp
     mp.undo()
@@ -210,11 +219,12 @@ def monkeypatch_module():
 def mcp_instance(app_settings):
     """
     Get the MCP server instance.
-    
+
     Returns:
         FastMCP instance from server.tools
     """
     from server.tools import mcp
+
     return mcp
 
 
@@ -222,21 +232,22 @@ def mcp_instance(app_settings):
 # Function-Scoped Test Client Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def test_app(monkeypatch):
     """
     Get the FastAPI application instance for testing.
-    
+
     Overrides environment variables to use test token,
     then returns the app instance.
-    
+
     Note: We use the global app instance rather than create_app()
     because the routes and MCP mount are configured at module load time.
     Environment overrides ensure the auth token is known for testing.
-    
+
     CRITICAL: Must clear BOTH settings cache AND rotatable_secret cache
     to ensure auth enforcement works correctly in tests.
-    
+
     Returns:
         FastAPI application configured for testing
     """
@@ -244,21 +255,24 @@ def test_app(monkeypatch):
     monkeypatch.setenv("MCP_AUTH_TOKEN", TEST_AUTH_TOKEN)
     monkeypatch.setenv("MCP_AUTH_ENABLED", "true")
     monkeypatch.setenv("ENVIRONMENT", "local")
-    
+
     # Clear settings cache to pick up new env vars
     from server.config import get_settings
+
     get_settings.cache_clear()
-    
+
     # CRITICAL: Also clear the rotatable secret cache so it picks up the new token
     # Without this, the auth system may use a stale "unconfigured" state
     from server.auth import get_rotatable_secret
+
     get_rotatable_secret.cache_clear()
-    
+
     # Force settings reload
     _ = get_settings()
-    
+
     # Use global app (routes are registered at module load time)
     from server.main import base_app
+
     return base_app
 
 
@@ -266,15 +280,15 @@ def test_app(monkeypatch):
 def test_client(test_app) -> Generator[TestClient, None, None]:
     """
     Synchronous TestClient for FastAPI endpoint testing.
-    
+
     This fixture creates a TestClient wrapped around the test app,
     suitable for testing HTTP endpoints without async.
-    
+
     Usage:
         def test_health(test_client):
             response = test_client.get("/health")
             assert response.status_code == 200
-    
+
     Yields:
         TestClient instance
     """
@@ -286,16 +300,16 @@ def test_client(test_app) -> Generator[TestClient, None, None]:
 async def async_test_client(test_app) -> AsyncGenerator[AsyncClient, None]:
     """
     Async HTTP client for testing FastAPI endpoints asynchronously.
-    
+
     This fixture creates an httpx.AsyncClient with ASGI transport,
     allowing async/await style testing of endpoints.
-    
+
     Usage:
         @pytest.mark.asyncio
         async def test_health(async_test_client):
             response = await async_test_client.get("/health")
             assert response.status_code == 200
-    
+
     Yields:
         httpx.AsyncClient with ASGI transport
     """
@@ -310,11 +324,12 @@ async def async_test_client(test_app) -> AsyncGenerator[AsyncClient, None]:
 # Authentication Test Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def auth_headers(test_token: str) -> dict[str, str]:
     """
     Valid authentication headers for testing.
-    
+
     Returns:
         Dictionary with Authorization header set to Bearer token
     """
@@ -325,7 +340,7 @@ def auth_headers(test_token: str) -> dict[str, str]:
 def invalid_auth_headers() -> dict[str, str]:
     """
     Invalid authentication headers for negative testing.
-    
+
     Returns:
         Dictionary with invalid Bearer token
     """
@@ -336,7 +351,7 @@ def invalid_auth_headers() -> dict[str, str]:
 def no_auth_headers() -> dict[str, str]:
     """
     Empty headers for testing missing authentication.
-    
+
     Returns:
         Empty dictionary (no auth header)
     """
@@ -347,11 +362,12 @@ def no_auth_headers() -> dict[str, str]:
 # Function-Scoped Fixtures (created fresh for each test)
 # =============================================================================
 
+
 @pytest.fixture
 def temp_dir() -> Generator[Path, None, None]:
     """
     Create a temporary directory for test files.
-    
+
     Yields:
         Path to temporary directory (cleaned up after test)
     """
@@ -363,7 +379,7 @@ def temp_dir() -> Generator[Path, None, None]:
 def temp_log_dir(temp_dir: Path) -> Path:
     """
     Create a temporary log directory.
-    
+
     Returns:
         Path to temporary log directory
     """
@@ -376,7 +392,7 @@ def temp_log_dir(temp_dir: Path) -> Path:
 def temp_encrypted_log_dir(temp_dir: Path) -> Path:
     """
     Create a temporary encrypted log directory.
-    
+
     Returns:
         Path to temporary encrypted log directory
     """
@@ -389,7 +405,7 @@ def temp_encrypted_log_dir(temp_dir: Path) -> Path:
 def mock_env_vars(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     """
     Set up mock environment variables for testing.
-    
+
     Returns:
         Dictionary of set environment variables
     """
@@ -407,11 +423,12 @@ def mock_env_vars(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
 # MCP Tool Test Fixtures (SECURE MODE - 2 Tools Only)
 # =============================================================================
 
+
 @pytest.fixture
 def explore_study_metadata_input():
     """
     Create a valid ExploreStudyMetadataInput for testing.
-    
+
     Returns:
         Dictionary with valid metadata query parameters
     """
@@ -426,7 +443,7 @@ def explore_study_metadata_input():
 def build_technical_request_input():
     """
     Create a valid BuildTechnicalRequestInput for testing.
-    
+
     Returns:
         Dictionary with valid technical request parameters
     """
@@ -485,13 +502,14 @@ def fetch_metrics_input():
 # Security Test Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def dangerous_queries() -> list[str]:
     """
     List of dangerous SQL queries for security testing.
-    
+
     These queries should all be rejected by the query validator.
-    
+
     Returns:
         List of SQL strings that should fail validation
     """
@@ -511,9 +529,9 @@ def dangerous_queries() -> list[str]:
 def safe_queries() -> list[str]:
     """
     List of safe SQL queries for positive testing.
-    
+
     These queries should all pass validation.
-    
+
     Returns:
         List of valid SELECT statements
     """
@@ -529,15 +547,18 @@ def safe_queries() -> list[str]:
 # Utility Functions
 # =============================================================================
 
-def assert_json_error_response(response, expected_status: int, error_key: str = "detail"):
+
+def assert_json_error_response(
+    response, expected_status: int, error_key: str = "detail"
+):
     """
     Assert that a response is a JSON error with expected status.
-    
+
     Args:
         response: HTTP response object
         expected_status: Expected HTTP status code
         error_key: Key to check for in JSON response
-        
+
     Raises:
         AssertionError: If response doesn't match expectations
     """

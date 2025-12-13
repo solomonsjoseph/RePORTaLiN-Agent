@@ -47,6 +47,9 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# Structural mistakes (nested src directories)
+src/src/
+
 # ============================================================================
 # 2. Virtual Environments
 # ============================================================================
@@ -158,13 +161,14 @@ coverage.xml
 nosetests.xml
 
 # ============================================================================
-# 7. Type Checking
+# 7. Type Checking & Linting
 # ============================================================================
 .mypy_cache/
 .dmypy.json
 dmypy.json
 .pyre/
 .pytype/
+.ruff_cache/
 
 # ============================================================================
 # 8. Jupyter Notebooks
@@ -308,3 +312,4 @@ NOTES.md
 # OS files
 .DS_Store
 Thumbs.db
+deidentification_mappings.enc

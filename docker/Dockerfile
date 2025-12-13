@@ -20,13 +20,13 @@
 #   - Run with --network none for air-gapped security
 #
 # Usage:
-#   docker build -t reportalin-specialist .
+#   docker build -f docker/Dockerfile -t reportalin-specialist .
 #   docker run -i --rm --network none \
 #     -v $(pwd)/results:/app/results:ro \
 #     reportalin-specialist
 #
 # Build with BuildKit for improved caching:
-#   DOCKER_BUILDKIT=1 docker build -t reportalin-specialist .
+#   DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t reportalin-specialist .
 
 # -----------------------------------------------------------------------------
 # Stage 1: Build dependencies with uv
@@ -54,24 +54,19 @@ RUN pip install --no-cache-dir uv
 # README.md is required by pyproject.toml metadata
 COPY pyproject.toml .python-version README.md ./
 
-# Copy minimal source structure needed for package installation
-# uv sync needs these to resolve the local package
-COPY server/__init__.py ./server/
-COPY server/py.typed ./server/
-COPY client/__init__.py ./client/
-COPY client/py.typed ./client/
-COPY shared/__init__.py ./shared/
-COPY shared/py.typed ./shared/
-COPY scripts/__init__.py ./scripts/
-COPY scripts/py.typed ./scripts/
-COPY __version__.py ./
+# Copy ONLY the src-layout package structure for proper installation
+# NOTE: The backward-compat shims (server/, client/, shared/, scripts/)
+# are excluded from the package per pyproject.toml and NOT needed in the
+# Docker container since we use the installed package: python -m reportalin.server
+COPY src/ ./src/
 
 # Create virtual environment and install dependencies with uv
 # UV_PROJECT_ENVIRONMENT tells uv sync to install to /opt/venv
 # --frozen ensures lockfile is used if present (uv.lock)
+# --no-editable installs the package non-editably (required for multi-stage builds)
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 RUN uv venv /opt/venv && \
-    (uv sync --frozen --no-dev 2>/dev/null || uv sync --no-dev)
+    (uv sync --frozen --no-dev --no-editable 2>/dev/null || uv sync --no-dev --no-editable)
 
 # Clean up unnecessary files from venv to minimize attack surface
 # hadolint ignore=SC2015
@@ -106,11 +101,18 @@ LABEL org.opencontainers.image.title="RePORTaLiN Specialist MCP Server" \
       data.classification="PHI/PII-Protected"
 
 # Install tini for proper init (handles signals correctly) and curl for healthchecks
-# hadolint ignore=DL3008
+# hadolint ignore=DL3008,DL3013,DL4006
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends tini curl && \
+    apt-get install -y --no-install-recommends curl wget ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Download tini as a static binary (more reliable than apt package)
+# Use architecture-specific binary for multi-arch support
+# hadolint ignore=DL3020
+ARG TARGETARCH
+ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini-${TARGETARCH} /usr/bin/tini
+RUN chmod +x /usr/bin/tini
 
 # Security: Create non-root user 'analyst' with explicit UID/GID
 RUN groupadd --gid 1000 analyst && \
@@ -118,20 +120,13 @@ RUN groupadd --gid 1000 analyst && \
 
 WORKDIR /app
 
-# Copy virtual environment from builder
+# Copy virtual environment from builder (includes installed reportalin package)
 COPY --from=builder --chown=analyst:analyst /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy only necessary application files (minimal footprint)
-COPY --chown=analyst:analyst server/ ./server/
-COPY --chown=analyst:analyst client/ ./client/
-COPY --chown=analyst:analyst shared/ ./shared/
-COPY --chown=analyst:analyst scripts/core/ ./scripts/core/
-COPY --chown=analyst:analyst scripts/utils/ ./scripts/utils/
-COPY --chown=analyst:analyst scripts/__init__.py ./scripts/
-
-COPY --chown=analyst:analyst config.py .
-COPY --chown=analyst:analyst __version__.py .
+# No need to copy source or shims - the reportalin package is already
+# installed in the venv from the builder stage via 'uv sync'
+# The installed package can be imported directly: python -m reportalin.server
 
 # Prepare directories for runtime (DO NOT COPY sensitive data)
 # Data will be mounted at runtime as read-only
@@ -140,9 +135,7 @@ RUN mkdir -p /app/results /app/encrypted_logs && \
     chmod 755 /app/results && \
     chmod 700 /app/encrypted_logs
 
-# Security: Set restrictive permissions on source files
-RUN chmod -R 500 /app/server /app/client /app/shared /app/scripts && \
-    chmod 400 /app/config.py /app/__version__.py
+# No PYTHONPATH needed - package is installed in venv and importable directly
 
 # Security: Switch to non-root user
 USER analyst
@@ -169,9 +162,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:8000/health 2>/dev/null || python -c "import sys; sys.exit(0)"
 
 # Use tini as init to handle signals properly (PID 1 zombie reaping)
-# NOTE: server.__main__ handles stdout isolation for JSON-RPC
-# SIGTERM handling: tini forwards signals, Python handles graceful shutdown
-ENTRYPOINT ["/usr/bin/tini", "--", "python", "-m", "server"]
+# Run the server using reportalin package directly
+ENTRYPOINT ["/usr/bin/tini", "--", "python", "-m", "reportalin.server"]
 
 # No CMD needed - stdio_runner handles transport automatically
 # Default grace period for SIGTERM: 10 seconds (Docker default)

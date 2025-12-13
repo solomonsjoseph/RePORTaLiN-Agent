@@ -10,14 +10,15 @@ that certain properties always hold true.
 
 from __future__ import annotations
 
-from hypothesis import given, strategies as st, assume, settings
 import pytest
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
+from pydantic import ValidationError
 
 from server.tools import (
-    ExploreStudyMetadataInput,
     BuildTechnicalRequestInput,
+    ExploreStudyMetadataInput,
 )
-from pydantic import ValidationError
 
 
 class TestExploreStudyMetadataInputProperties:
@@ -27,10 +28,10 @@ class TestExploreStudyMetadataInputProperties:
     def test_queries_with_forbidden_patterns_rejected(self, query: str) -> None:
         """Property: Any query containing forbidden patterns should be rejected."""
         forbidden_patterns = ["data/dataset", "indo-vap", ".xlsx", "raw data"]
-        
+
         for pattern in forbidden_patterns:
             full_query = f"{query} {pattern} {query}"
-            
+
             with pytest.raises(ValidationError):
                 ExploreStudyMetadataInput(query=full_query)
 
@@ -40,17 +41,27 @@ class TestExploreStudyMetadataInputProperties:
         """Property: Safe queries meeting length requirements should pass."""
         # Filter out any potentially forbidden patterns
         forbidden = [
-            "data/dataset", "data\\dataset", "indo-vap", "csv_files", 
-            ".xlsx", "raw data", "patient names", "show me all patients",
-            "list all records", "export data", "download dataset",
-            "individual records", "read from file", "access the raw dataset"
+            "data/dataset",
+            "data\\dataset",
+            "indo-vap",
+            "csv_files",
+            ".xlsx",
+            "raw data",
+            "patient names",
+            "show me all patients",
+            "list all records",
+            "export data",
+            "download dataset",
+            "individual records",
+            "read from file",
+            "access the raw dataset",
         ]
-        
+
         text_lower = text.lower()
         assume(not any(f in text_lower for f in forbidden))
         assume(5 <= len(text.strip()) <= 500)
         assume(len(text.strip()) >= 5)  # Minimum query length
-        
+
         try:
             input_data = ExploreStudyMetadataInput(query=text)
             assert input_data.query == text.strip()
@@ -81,19 +92,19 @@ class TestBuildTechnicalRequestInputProperties:
     )
     @settings(max_examples=50)
     def test_safe_descriptions_accepted(
-        self, 
-        description: str, 
+        self,
+        description: str,
         inclusion: list[str],
         exclusion: list[str],
     ) -> None:
         """Property: Safe descriptions meeting length requirements should pass."""
         # Filter out forbidden patterns
         forbidden = ["data/dataset", "data\\dataset", "indo-vap", ".xlsx", "raw data"]
-        
+
         desc_lower = description.lower()
         assume(not any(f in desc_lower for f in forbidden))
         assume(10 <= len(description.strip()) <= 500)
-        
+
         try:
             input_data = BuildTechnicalRequestInput(
                 description=description,
@@ -120,13 +131,15 @@ class TestBuildTechnicalRequestInputProperties:
         )
         assert input_data.output_format == output_format
 
-    @given(st.text(min_size=1, max_size=20).filter(
-        lambda x: x not in ["concept_sheet", "query_logic"]
-    ))
+    @given(
+        st.text(min_size=1, max_size=20).filter(
+            lambda x: x not in ["concept_sheet", "query_logic"]
+        )
+    )
     def test_invalid_output_formats_always_rejected(self, output_format: str) -> None:
         """Property: Invalid output formats should always be rejected."""
         assume(output_format not in ["concept_sheet", "query_logic"])
-        
+
         with pytest.raises(ValidationError):
             BuildTechnicalRequestInput(
                 description="Valid description for testing purposes",
@@ -137,45 +150,77 @@ class TestBuildTechnicalRequestInputProperties:
 class TestSecurityValidationProperties:
     """Property-based tests for security validation."""
 
-    @given(st.sampled_from([
-        "data/dataset", "data\\dataset", "indo-vap", "csv_files",
-        "6_HIV.xlsx", "read from file", "access the raw dataset",
-    ]))
+    @given(
+        st.sampled_from(
+            [
+                "data/dataset",
+                "data\\dataset",
+                "indo-vap",
+                "csv_files",
+                "6_HIV.xlsx",
+                "read from file",
+                "access the raw dataset",
+            ]
+        )
+    )
     def test_forbidden_patterns_always_blocked_in_metadata(self, pattern: str) -> None:
         """Property: Forbidden patterns are always rejected in metadata queries."""
         query = f"Please help me analyze {pattern} data"
-        
+
         with pytest.raises(ValidationError) as exc_info:
             ExploreStudyMetadataInput(query=query)
-        
+
         # Should raise security-related error
         error_str = str(exc_info.value).lower()
-        assert "security" in error_str or "prohibited" in error_str or "metadata only" in error_str
+        assert (
+            "security" in error_str
+            or "prohibited" in error_str
+            or "metadata only" in error_str
+        )
 
-    @given(st.sampled_from([
-        "show me all patients", "list all records", "export data",
-        "download dataset", "raw data", "patient names", "individual records",
-    ]))
+    @given(
+        st.sampled_from(
+            [
+                "show me all patients",
+                "list all records",
+                "export data",
+                "download dataset",
+                "raw data",
+                "patient names",
+                "individual records",
+            ]
+        )
+    )
     def test_phi_patterns_always_blocked(self, phi_pattern: str) -> None:
         """Property: PHI request patterns are always rejected."""
         query = f"I need to {phi_pattern} from the study"
-        
+
         with pytest.raises(ValidationError) as exc_info:
             ExploreStudyMetadataInput(query=query)
-        
+
         # Should provide guidance about metadata-only access
         assert "metadata only" in str(exc_info.value).lower()
 
-    @given(st.sampled_from([
-        "data/dataset", "data\\dataset", "indo-vap", ".xlsx", "raw data",
-    ]))
-    def test_forbidden_patterns_always_blocked_in_technical_request(self, pattern: str) -> None:
+    @given(
+        st.sampled_from(
+            [
+                "data/dataset",
+                "data\\dataset",
+                "indo-vap",
+                ".xlsx",
+                "raw data",
+            ]
+        )
+    )
+    def test_forbidden_patterns_always_blocked_in_technical_request(
+        self, pattern: str
+    ) -> None:
         """Property: Forbidden patterns are always rejected in technical requests."""
         description = f"Access {pattern} for analysis"
-        
+
         with pytest.raises(ValidationError) as exc_info:
             BuildTechnicalRequestInput(description=description)
-        
+
         assert "SECURITY ALERT" in str(exc_info.value)
 
 
@@ -188,17 +233,24 @@ class TestInputSanitizationProperties:
         """Property: Query whitespace should always be trimmed."""
         # Filter out forbidden patterns
         forbidden = [
-            "data/dataset", "indo-vap", ".xlsx", "raw data", "patient names",
-            "show me all patients", "export data", "download dataset",
-            "list all records", "individual records"
+            "data/dataset",
+            "indo-vap",
+            ".xlsx",
+            "raw data",
+            "patient names",
+            "show me all patients",
+            "export data",
+            "download dataset",
+            "list all records",
+            "individual records",
         ]
-        
+
         text_lower = text.lower()
         assume(not any(f in text_lower for f in forbidden))
         assume(len(text.strip()) >= 5)
-        
+
         padded_query = f"  {text}  "
-        
+
         try:
             input_data = ExploreStudyMetadataInput(query=padded_query)
             assert input_data.query == padded_query.strip()
@@ -212,13 +264,13 @@ class TestInputSanitizationProperties:
         """Property: Description whitespace should always be trimmed."""
         # Filter out forbidden patterns
         forbidden = ["data/dataset", "indo-vap", ".xlsx", "raw data"]
-        
+
         text_lower = text.lower()
         assume(not any(f in text_lower for f in forbidden))
         assume(len(text.strip()) >= 10)
-        
+
         padded_description = f"  {text}  "
-        
+
         try:
             input_data = BuildTechnicalRequestInput(description=padded_description)
             assert input_data.description == padded_description.strip()

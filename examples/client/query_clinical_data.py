@@ -33,10 +33,7 @@ import os
 import sys
 from pathlib import Path
 
-# Add parent to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from client.react_rag_agent import ReActConfig, ReActRAGAgent
+from reportalin.client.react_rag_agent import ReActConfig, ReActRAGAgent
 
 
 async def run_consultant_queries():

@@ -145,6 +145,17 @@ mcp_server/
 *.orig
 
 # -----------------------------------------------------------------------------
+# Backward-Compatibility Shims (NOT needed in Docker - package is installed)
+# -----------------------------------------------------------------------------
+# These directories contain only shims that redirect to src/reportalin/
+# They are excluded from the package build per pyproject.toml
+# Docker uses the installed package directly, so these are bloat
+server/
+client/
+shared/
+scripts/
+
+# -----------------------------------------------------------------------------
 # Additional Python/Build Artifacts (Best Practices Update 2025)
 # -----------------------------------------------------------------------------
 *.pyo

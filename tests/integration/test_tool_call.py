@@ -17,8 +17,8 @@ Security constraints are enforced:
 import pytest
 
 from server.tools import (
-    ExploreStudyMetadataInput,
     BuildTechnicalRequestInput,
+    ExploreStudyMetadataInput,
 )
 
 pytestmark = [
@@ -32,10 +32,11 @@ pytestmark = [
 # explore_study_metadata Tool Tests
 # =============================================================================
 
+
 async def test_explore_metadata_variable_check():
     """Test explore_study_metadata for variable availability."""
+
     from server.tools import explore_study_metadata
-    from mcp.server.fastmcp import Context
 
     input_data = ExploreStudyMetadataInput(
         query="Do we have CD4 counts available in the study?",
@@ -45,7 +46,7 @@ async def test_explore_metadata_variable_check():
     class MockContext:
         async def info(self, msg: str) -> None:
             pass
-    
+
     result = await explore_study_metadata(input_data, MockContext())
 
     assert result["success"] is True
@@ -57,7 +58,7 @@ async def test_explore_metadata_variable_check():
 async def test_explore_metadata_site_query():
     """Test explore_study_metadata for site information."""
     from server.tools import explore_study_metadata
-    
+
     input_data = ExploreStudyMetadataInput(
         query="What study sites are available?",
         site_filter="Pune",
@@ -66,7 +67,7 @@ async def test_explore_metadata_site_query():
     class MockContext:
         async def info(self, msg: str) -> None:
             pass
-    
+
     result = await explore_study_metadata(input_data, MockContext())
 
     assert result["success"] is True
@@ -77,7 +78,7 @@ async def test_explore_metadata_site_query():
 async def test_explore_metadata_enrollment_stats():
     """Test explore_study_metadata for enrollment statistics."""
     from server.tools import explore_study_metadata
-    
+
     input_data = ExploreStudyMetadataInput(
         query="How many participants are enrolled in the study?",
     )
@@ -85,7 +86,7 @@ async def test_explore_metadata_enrollment_stats():
     class MockContext:
         async def info(self, msg: str) -> None:
             pass
-    
+
     result = await explore_study_metadata(input_data, MockContext())
 
     assert result["success"] is True
@@ -96,7 +97,7 @@ async def test_explore_metadata_enrollment_stats():
 async def test_explore_metadata_time_points():
     """Test explore_study_metadata for time point information."""
     from server.tools import explore_study_metadata
-    
+
     input_data = ExploreStudyMetadataInput(
         query="What follow-up time points are collected?",
         time_point_filter="Month 24",
@@ -105,7 +106,7 @@ async def test_explore_metadata_time_points():
     class MockContext:
         async def info(self, msg: str) -> None:
             pass
-    
+
     result = await explore_study_metadata(input_data, MockContext())
 
     assert result["success"] is True
@@ -132,10 +133,11 @@ async def test_explore_metadata_rejects_phi_request():
 # build_technical_request Tool Tests
 # =============================================================================
 
+
 async def test_build_request_concept_sheet():
     """Test build_technical_request for concept sheet generation."""
     from server.tools import build_technical_request
-    
+
     input_data = BuildTechnicalRequestInput(
         description="Analyze treatment outcomes in TB patients with diabetes",
         inclusion_criteria=["Age 18-65", "Pulmonary TB", "Diabetes"],
@@ -148,7 +150,7 @@ async def test_build_request_concept_sheet():
     class MockContext:
         async def info(self, msg: str) -> None:
             pass
-    
+
     result = await build_technical_request(input_data, MockContext())
 
     assert result["success"] is True
@@ -163,7 +165,7 @@ async def test_build_request_concept_sheet():
 async def test_build_request_query_logic():
     """Test build_technical_request for query logic generation."""
     from server.tools import build_technical_request
-    
+
     input_data = BuildTechnicalRequestInput(
         description="Generate selection criteria for female participants",
         inclusion_criteria=["Female", "Age 18-45"],
@@ -174,7 +176,7 @@ async def test_build_request_query_logic():
     class MockContext:
         async def info(self, msg: str) -> None:
             pass
-    
+
     result = await build_technical_request(input_data, MockContext())
 
     assert result["success"] is True
@@ -187,7 +189,7 @@ async def test_build_request_query_logic():
 async def test_build_request_minimal():
     """Test build_technical_request with minimal input."""
     from server.tools import build_technical_request
-    
+
     input_data = BuildTechnicalRequestInput(
         description="Compare demographics across study sites",
     )
@@ -195,7 +197,7 @@ async def test_build_request_minimal():
     class MockContext:
         async def info(self, msg: str) -> None:
             pass
-    
+
     result = await build_technical_request(input_data, MockContext())
 
     assert result["success"] is True
@@ -206,7 +208,7 @@ async def test_build_request_minimal():
 async def test_build_request_variable_mapping():
     """Test that build_technical_request maps variables correctly."""
     from server.tools import build_technical_request
-    
+
     input_data = BuildTechnicalRequestInput(
         description="Extract TB treatment outcome data",
         variables_of_interest=["age", "sex", "hiv", "cd4"],
@@ -215,7 +217,7 @@ async def test_build_request_variable_mapping():
     class MockContext:
         async def info(self, msg: str) -> None:
             pass
-    
+
     result = await build_technical_request(input_data, MockContext())
 
     assert result["success"] is True
@@ -237,10 +239,11 @@ async def test_build_request_rejects_forbidden_access():
 # Security Integration Tests
 # =============================================================================
 
+
 async def test_output_sanitization():
     """Test that outputs are properly sanitized."""
     from server.tools import explore_study_metadata
-    
+
     input_data = ExploreStudyMetadataInput(
         query="What data domains are available in the study?",
     )
@@ -248,11 +251,11 @@ async def test_output_sanitization():
     class MockContext:
         async def info(self, msg: str) -> None:
             pass
-    
+
     result = await explore_study_metadata(input_data, MockContext())
 
     assert result["success"] is True
-    
+
     # Verify no sensitive fields in output
     result_str = str(result).lower()
     sensitive_terms = ["ssn", "aadhaar", "phone", "email", "address"]
@@ -265,7 +268,7 @@ async def test_output_sanitization():
 async def test_no_raw_phi_in_responses():
     """Test that no raw PHI appears in any response."""
     from server.tools import explore_study_metadata
-    
+
     input_data = ExploreStudyMetadataInput(
         query="What is the feasibility of studying TB outcomes?",
     )
@@ -273,10 +276,13 @@ async def test_no_raw_phi_in_responses():
     class MockContext:
         async def info(self, msg: str) -> None:
             pass
-    
+
     result = await explore_study_metadata(input_data, MockContext())
 
     assert result["success"] is True
     assert "note" in result
     # Should mention de-identified or no patient-level data
-    assert "patient-level" in result["note"].lower() or "de-identified" in result["source"].lower()
+    assert (
+        "patient-level" in result["note"].lower()
+        or "de-identified" in result["source"].lower()
+    )

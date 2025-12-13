@@ -28,6 +28,7 @@ from server.auth import (
 # AuthContext Tests
 # =============================================================================
 
+
 class TestAuthContext:
     """Tests for the AuthContext dataclass."""
 
@@ -86,6 +87,7 @@ class TestAuthContext:
 # Token Verification Tests
 # =============================================================================
 
+
 class TestVerifyToken:
     """Tests for the verify_token function."""
 
@@ -136,6 +138,7 @@ class TestVerifyToken:
 # Token Generation Tests
 # =============================================================================
 
+
 class TestGenerateToken:
     """Tests for the generate_token function."""
 
@@ -161,6 +164,7 @@ class TestGenerateToken:
 # Request Token Extraction Tests
 # =============================================================================
 
+
 class TestGetTokenFromRequest:
     """Tests for the get_token_from_request function.
 
@@ -180,8 +184,7 @@ class TestGetTokenFromRequest:
 
         # Create credentials object like HTTPBearer would
         credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials="mytoken123"
+            scheme="Bearer", credentials="mytoken123"
         )
 
         token, method = await get_token_from_request(request, credentials)
@@ -220,8 +223,7 @@ class TestGetTokenFromRequest:
         request.query_params = {"token": "querytoken"}
 
         credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials="bearertoken"
+            scheme="Bearer", credentials="bearertoken"
         )
 
         token, method = await get_token_from_request(request, credentials)

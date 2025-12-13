@@ -65,6 +65,7 @@ DEFAULT_TIMEOUT = 10.0  # seconds
 # Result Formatting
 # =============================================================================
 
+
 class VerificationResult:
     """
     Structured result from verification check.
@@ -117,6 +118,7 @@ class VerificationResult:
 # Verification Logic
 # =============================================================================
 
+
 async def verify_server(
     server_url: str,
     auth_token: str,
@@ -142,7 +144,7 @@ async def verify_server(
     """
     try:
         # Import client here to avoid import errors if not installed
-        from client.mcp_client import (
+        from reportalin.client.mcp_client import (
             MCPAuthenticationError,
             MCPConnectionError,
             UniversalMCPClient,
@@ -240,7 +242,9 @@ def get_auth_token_from_env() -> str | None:
                     if line.startswith("MCP_AUTH_TOKEN="):
                         # Handle quoted values
                         value = line.split("=", 1)[1].strip()
-                        if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+                        if (value.startswith('"') and value.endswith('"')) or (
+                            value.startswith("'") and value.endswith("'")
+                        ):
                             value = value[1:-1]
                         return value
         except Exception:
@@ -252,6 +256,7 @@ def get_auth_token_from_env() -> str | None:
 # =============================================================================
 # CLI
 # =============================================================================
+
 
 def print_result(result: VerificationResult, verbose: bool = False) -> None:
     """
@@ -320,7 +325,8 @@ Examples:
     )
 
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Show detailed output including tool list",
     )

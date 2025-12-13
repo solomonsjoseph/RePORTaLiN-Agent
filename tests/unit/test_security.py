@@ -47,6 +47,7 @@ pytestmark = [pytest.mark.security, pytest.mark.unit]
 # Timing Attack Prevention Tests
 # =============================================================================
 
+
 class TestTimingAttackPrevention:
     """
     Tests that token verification uses constant-time comparison.
@@ -104,7 +105,9 @@ class TestTimingAttackPrevention:
 
         # The ratio between any two should be close to 1.0
         # A timing attack would show wrong_first significantly faster than wrong_last
-        ratio_first_last = mean_wrong_first / mean_wrong_last if mean_wrong_last else 1.0
+        ratio_first_last = (
+            mean_wrong_first / mean_wrong_last if mean_wrong_last else 1.0
+        )
 
         # Allow 50% variance (generous due to system noise)
         # Non-constant time would show >2x difference
@@ -118,6 +121,7 @@ class TestTimingAttackPrevention:
 # =============================================================================
 # Token Entropy Tests
 # =============================================================================
+
 
 class TestTokenEntropy:
     """
@@ -148,6 +152,7 @@ class TestTokenEntropy:
 # =============================================================================
 # Authentication Bypass Tests
 # =============================================================================
+
 
 class TestAuthenticationBypass:
     """
@@ -197,6 +202,7 @@ class TestAuthenticationBypass:
 # Input Sanitization Tests
 # =============================================================================
 
+
 class TestInputSanitization:
     """
     Tests for proper input handling in auth system.
@@ -228,6 +234,7 @@ class TestInputSanitization:
 # =============================================================================
 # Token Storage Security Tests
 # =============================================================================
+
 
 class TestTokenStorageSecurity:
     """
@@ -270,6 +277,7 @@ class TestTokenStorageSecurity:
 # =============================================================================
 # AES-256-GCM Encryption Tests (Phase 1 Security Hardening)
 # =============================================================================
+
 
 class TestAES256GCMCipher:
     """Tests for the AES-256-GCM cipher implementation."""
@@ -348,7 +356,9 @@ class TestAES256GCMCipher:
 
         encrypted = cipher.encrypt(plaintext)
 
-        tampered_ciphertext = bytes([encrypted.ciphertext[0] ^ 0xFF]) + encrypted.ciphertext[1:]
+        tampered_ciphertext = (
+            bytes([encrypted.ciphertext[0] ^ 0xFF]) + encrypted.ciphertext[1:]
+        )
         tampered_payload = EncryptedPayload(
             nonce=encrypted.nonce,
             ciphertext=tampered_ciphertext,
@@ -368,6 +378,7 @@ class TestAES256GCMCipher:
 # =============================================================================
 # Rate Limiter Tests (Phase 1 Security Hardening)
 # =============================================================================
+
 
 class TestRateLimiter:
     """Tests for the rate limiter implementation."""
@@ -435,6 +446,7 @@ class TestRateLimiter:
 # =============================================================================
 # Rotatable Secret Tests (Phase 1 Security Hardening)
 # =============================================================================
+
 
 class TestRotatableSecret:
     """Tests for rotatable secrets implementation."""

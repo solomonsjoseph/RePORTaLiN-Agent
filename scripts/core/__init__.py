@@ -1,120 +1,51 @@
-#!/usr/bin/env python3
+"""Backward-compatible shim for scripts/core package.
+
+DEPRECATED: Use reportalin.core instead.
+This module re-exports symbols from reportalin.core for backward compatibility.
 """
-RePORTaLiN-Specialist Core Package.
+# Settings
+from reportalin.core.config import (
+    Environment,
+    LogLevel,
+    Settings,
+    get_project_root,
+    get_settings,
+    reload_settings,
+)
 
-Centralized configuration, logging, and security modules following modern
-Python best practices (2024+).
+# Logging
+from reportalin.core.logging import (
+    bind_context,
+    clear_context,
+    configure_logging,
+    get_logger,
+    get_request_id,
+    set_request_id,
+)
 
-Modules:
-    - ``settings``: Pydantic-based configuration management with env var support
-    - ``structured_logging``: Structured logging with JSON output and PHI redaction
-    - ``log_decryptor``: Secure log decryption utility for authorized developers
-
-Best Practices Implemented:
-    - Type-safe configuration with Pydantic Settings v2
-    - Structured logging with contextual information
-    - Environment variable support with .env files
-    - Automatic PHI/PII redaction in logs
-    - RSA/AES hybrid encryption for sensitive logs
-    - Key rotation tracking and warnings
-    - Developer access controls via key fingerprints
-
-Configuration:
-    Settings can be configured via environment variables (REPORTALIN_* prefix)
-    or a .env file. See .env.example for available options.
-
-    ::
-
-        # Environment variables
-        export REPORTALIN_LOG_LEVEL=DEBUG
-        export REPORTALIN_LOG_VERBOSE=true
-        export REPORTALIN_MCP_TRANSPORT=stdio
-
-Usage:
-    ::
-
-        from scripts.core import get_settings, get_structured_logger, log_context
-
-        # Get validated settings
-        settings = get_settings()
-        print(f"Log level: {settings.logging.level}")
-        print(f"Data directory: {settings.data_dir}")
-
-        # Get structured logger with PHI redaction
-        logger = get_structured_logger(__name__)
-        logger.info("Processing started", file_count=10)
-
-        # Use context manager for request-scoped logging
-        with log_context(request_id="abc123", user="analyst"):
-            logger.info("Query executed", query_type="aggregate")
-
-Log Decryption (for authorized developers):
-    ::
-
-        # Generate keypair
-        python -m scripts.core.log_decryptor --generate-keys
-
-        # Decrypt logs
-        python -m scripts.core.log_decryptor encrypted_logs/ --level ERROR
-
-See Also:
-    - .env.example - Configuration options
-    - docs/MCP_SERVER_SETUP.md - Deployment guide
-    - scripts/utils/logging.py - Base logging implementation
-    - server/ - MCP server implementation
-"""
-
-from __future__ import annotations
-
-from .log_decryptor import (
+# Log Decryption
+from reportalin.core.log_decryptor import (
     AuthorizationError,
     DecryptionError,
     LogDecryptor,
     generate_keypair,
 )
-from .settings import (
-    EncryptionSettings,
-    LoggingSettings,
-    LogLevel,
-    MCPSettings,
-    Settings,
-    TransportMode,
-    get_settings,
-    reload_settings,
-)
-from .structured_logging import (
-    BoundLogger,
-    JSONFormatter,
-    StructuredLogger,
-    clear_context,
-    configure_logging,
-    get_structured_logger,
-    log_context,
-    set_context,
-)
 
 __all__ = [
     "AuthorizationError",
-    "BoundLogger",
     "DecryptionError",
-    "EncryptionSettings",
-    "JSONFormatter",
-    # Log Decryption
+    "Environment",
     "LogDecryptor",
     "LogLevel",
-    "LoggingSettings",
-    "MCPSettings",
-    # Settings
     "Settings",
-    "StructuredLogger",
-    "TransportMode",
+    "bind_context",
     "clear_context",
-    # Logging
     "configure_logging",
     "generate_keypair",
+    "get_logger",
+    "get_project_root",
+    "get_request_id",
     "get_settings",
-    "get_structured_logger",
-    "log_context",
     "reload_settings",
-    "set_context",
+    "set_request_id",
 ]

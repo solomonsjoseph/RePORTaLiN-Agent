@@ -36,6 +36,7 @@ from client.agent import (
 # Test Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def sample_config() -> AgentConfig:
     """Create a sample agent configuration."""
@@ -65,43 +66,47 @@ def local_llm_config() -> AgentConfig:
 @pytest.fixture
 def mock_mcp_client() -> AsyncMock:
     """Create a mock MCP client.
-    
+
     Note: combined_search is the DEFAULT tool for all queries.
     """
     client = AsyncMock()
     client.connect = AsyncMock()
     client.close = AsyncMock()
-    client.get_tools_for_openai = AsyncMock(return_value=[
-        {
-            "type": "function",
-            "function": {
-                "name": "combined_search",
-                "description": "DEFAULT - Search ALL data sources for statistics",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "concept": {"type": "string"},
+    client.get_tools_for_openai = AsyncMock(
+        return_value=[
+            {
+                "type": "function",
+                "function": {
+                    "name": "combined_search",
+                    "description": "DEFAULT - Search ALL data sources for statistics",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "concept": {"type": "string"},
+                        },
+                        "required": ["concept"],
                     },
-                    "required": ["concept"],
                 },
             },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "search_data_dictionary",
-                "description": "Variable definitions ONLY (no statistics)",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string"},
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_data_dictionary",
+                    "description": "Variable definitions ONLY (no statistics)",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string"},
+                        },
+                        "required": ["query"],
                     },
-                    "required": ["query"],
                 },
             },
-        },
-    ])
-    client.execute_tool = AsyncMock(return_value='{"concept": "diabetes", "variables_found": 5}')
+        ]
+    )
+    client.execute_tool = AsyncMock(
+        return_value='{"concept": "diabetes", "variables_found": 5}'
+    )
     return client
 
 
@@ -156,6 +161,7 @@ def create_completion_response(
 # =============================================================================
 # Configuration Tests
 # =============================================================================
+
 
 class TestAgentConfig:
     """Tests for AgentConfig."""
@@ -242,6 +248,7 @@ class TestAgentConfig:
 # Agent Initialization Tests
 # =============================================================================
 
+
 class TestAgentInitialization:
     """Tests for MCPAgent initialization."""
 
@@ -325,6 +332,7 @@ class TestAgentInitialization:
 # ReAct Loop Tests
 # =============================================================================
 
+
 class TestReActLoop:
     """Tests for the ReAct loop implementation."""
 
@@ -366,13 +374,17 @@ class TestReActLoop:
             side_effect=[
                 create_completion_response(
                     content=None,
-                    tool_calls=[{
-                        "id": "call_123",
-                        "name": "combined_search",
-                        "arguments": {"concept": "diabetes"},
-                    }],
+                    tool_calls=[
+                        {
+                            "id": "call_123",
+                            "name": "combined_search",
+                            "arguments": {"concept": "diabetes"},
+                        }
+                    ],
                 ),
-                create_completion_response("Found 5 diabetes-related variables in the dataset."),
+                create_completion_response(
+                    "Found 5 diabetes-related variables in the dataset."
+                ),
             ]
         )
 
@@ -386,7 +398,9 @@ class TestReActLoop:
             response = await agent.run("What diabetes data is available?")
 
         assert "diabetes" in response.lower() or "variables" in response.lower()
-        mock_mcp_client.execute_tool.assert_called_once_with("combined_search", {"concept": "diabetes"})
+        mock_mcp_client.execute_tool.assert_called_once_with(
+            "combined_search", {"concept": "diabetes"}
+        )
 
     @pytest.mark.asyncio
     async def test_run_with_multiple_tool_calls(
@@ -419,7 +433,10 @@ class TestReActLoop:
         )
 
         mock_mcp_client.execute_tool = AsyncMock(
-            side_effect=['{"concept": "diabetes", "variables_found": 5}', '{"query": "HIV", "variables_found": 3}']
+            side_effect=[
+                '{"concept": "diabetes", "variables_found": 5}',
+                '{"query": "HIV", "variables_found": 3}',
+            ]
         )
 
         agent = MCPAgent(
@@ -445,11 +462,13 @@ class TestReActLoop:
         mock_llm_client.chat.completions.create = AsyncMock(
             return_value=create_completion_response(
                 content=None,
-                tool_calls=[{
-                    "id": "call_loop",
-                    "name": "combined_search",
-                    "arguments": {"concept": "test"},
-                }],
+                tool_calls=[
+                    {
+                        "id": "call_loop",
+                        "name": "combined_search",
+                        "arguments": {"concept": "test"},
+                    }
+                ],
             )
         )
 
@@ -487,6 +506,7 @@ class TestReActLoop:
 # =============================================================================
 # Message History Tests
 # =============================================================================
+
 
 class TestMessageHistory:
     """Tests for conversation history management."""
@@ -530,11 +550,13 @@ class TestMessageHistory:
             side_effect=[
                 create_completion_response(
                     content=None,
-                    tool_calls=[{
-                        "id": "call_abc",
-                        "name": "combined_search",
-                        "arguments": {"concept": "diabetes"},
-                    }],
+                    tool_calls=[
+                        {
+                            "id": "call_abc",
+                            "name": "combined_search",
+                            "arguments": {"concept": "diabetes"},
+                        }
+                    ],
                 ),
                 create_completion_response("Done!"),
             ]
@@ -587,6 +609,7 @@ class TestMessageHistory:
 # Error Handling Tests
 # =============================================================================
 
+
 class TestErrorHandling:
     """Tests for error handling."""
 
@@ -604,11 +627,13 @@ class TestErrorHandling:
             side_effect=[
                 create_completion_response(
                     content=None,
-                    tool_calls=[{
-                        "id": "call_fail",
-                        "name": "combined_search",
-                        "arguments": {"concept": "nonexistent"},
-                    }],
+                    tool_calls=[
+                        {
+                            "id": "call_fail",
+                            "name": "combined_search",
+                            "arguments": {"concept": "nonexistent"},
+                        }
+                    ],
                 ),
                 create_completion_response("The search failed."),
             ]
@@ -662,6 +687,7 @@ class TestErrorHandling:
 # Integration Tests (with mocked externals)
 # =============================================================================
 
+
 class TestIntegration:
     """Integration tests with full agent flow."""
 
@@ -679,20 +705,24 @@ class TestIntegration:
                 # First: Search for diabetes data
                 create_completion_response(
                     content="Let me search for diabetes-related data first.",
-                    tool_calls=[{
-                        "id": "call_search",
-                        "name": "combined_search",
-                        "arguments": {"concept": "diabetes"},
-                    }],
+                    tool_calls=[
+                        {
+                            "id": "call_search",
+                            "name": "combined_search",
+                            "arguments": {"concept": "diabetes"},
+                        }
+                    ],
                 ),
                 # Second: Look up specific variable definitions
                 create_completion_response(
                     content="Found diabetes variables. Now let me get the definitions.",
-                    tool_calls=[{
-                        "id": "call_dict",
-                        "name": "search_data_dictionary",
-                        "arguments": {"query": "DMSTAT"},
-                    }],
+                    tool_calls=[
+                        {
+                            "id": "call_dict",
+                            "name": "search_data_dictionary",
+                            "arguments": {"query": "DMSTAT"},
+                        }
+                    ],
                 ),
                 # Final: Summarize results
                 create_completion_response(

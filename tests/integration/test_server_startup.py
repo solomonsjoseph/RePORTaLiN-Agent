@@ -27,6 +27,7 @@ pytestmark = [
 # Fixture for properly configured app with auth
 # =============================================================================
 
+
 @pytest.fixture
 def configured_app(monkeypatch):
     """
@@ -43,13 +44,16 @@ def configured_app(monkeypatch):
 
     # Clear all caches
     from server.config import get_settings
+
     get_settings.cache_clear()
 
     from server.auth import get_rotatable_secret
+
     get_rotatable_secret.cache_clear()
 
     # Now import and return the app
     from server.main import base_app
+
     return base_app
 
 
@@ -57,12 +61,14 @@ def configured_app(monkeypatch):
 # Server Import Tests
 # =============================================================================
 
+
 def test_server_import():
     """Test that the server modules can be imported."""
     from server import (
         app,
         mcp,
     )
+
     assert app is not None
     assert mcp is not None
 
@@ -70,6 +76,7 @@ def test_server_import():
 def test_settings_load():
     """Test that settings load correctly."""
     from server.config import get_settings
+
     settings = get_settings()
     assert settings.mcp_host is not None
     assert settings.mcp_port > 0
@@ -80,15 +87,17 @@ def test_settings_load():
 # Tool Registration Tests
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_tools_registered():
     """Test that all expected tools are registered (10 tools total).
-    
+
     Tool Selection Guide:
     - combined_search: DEFAULT for ALL queries (searches ALL data sources)
     - search_data_dictionary: ONLY for variable definitions (no statistics)
     """
     from server.tools import mcp
+
     tools = await mcp.list_tools()
 
     tool_names = [t.name for t in tools]
@@ -126,6 +135,7 @@ async def test_tools_registered():
 async def test_tool_schemas():
     """Test that all tools have valid JSON schemas."""
     from server.tools import mcp
+
     tools = await mcp.list_tools()
 
     for tool in tools:
@@ -159,13 +169,16 @@ def test_tool_registry():
 # HTTP Endpoint Tests (using configured_app fixture)
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_health_endpoint(configured_app):
     """Test health check endpoint (no auth required)."""
     from shared.constants import SERVER_NAME
 
     transport = ASGITransport(app=configured_app)
-    async with AsyncClient(transport=transport, base_url="http://localhost:8000") as client:
+    async with AsyncClient(
+        transport=transport, base_url="http://localhost:8000"
+    ) as client:
         response = await client.get("/health")
 
         assert response.status_code == 200
@@ -178,7 +191,9 @@ async def test_health_endpoint(configured_app):
 async def test_ready_endpoint(configured_app):
     """Test readiness check endpoint (no auth required)."""
     transport = ASGITransport(app=configured_app)
-    async with AsyncClient(transport=transport, base_url="http://localhost:8000") as client:
+    async with AsyncClient(
+        transport=transport, base_url="http://localhost:8000"
+    ) as client:
         response = await client.get("/ready")
 
         assert response.status_code == 200
@@ -190,7 +205,9 @@ async def test_ready_endpoint(configured_app):
 async def test_tools_endpoint_requires_auth(configured_app):
     """Test that /tools endpoint requires authentication."""
     transport = ASGITransport(app=configured_app)
-    async with AsyncClient(transport=transport, base_url="http://localhost:8000") as client:
+    async with AsyncClient(
+        transport=transport, base_url="http://localhost:8000"
+    ) as client:
         response = await client.get("/tools")
 
         # Should fail without auth
@@ -201,10 +218,11 @@ async def test_tools_endpoint_requires_auth(configured_app):
 async def test_tools_endpoint_with_auth(configured_app):
     """Test /tools endpoint with valid authentication."""
     transport = ASGITransport(app=configured_app)
-    async with AsyncClient(transport=transport, base_url="http://localhost:8000") as client:
+    async with AsyncClient(
+        transport=transport, base_url="http://localhost:8000"
+    ) as client:
         response = await client.get(
-            "/tools",
-            headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"}
+            "/tools", headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"}
         )
 
         assert response.status_code == 200
@@ -217,11 +235,14 @@ async def test_tools_endpoint_with_auth(configured_app):
 # SSE Transport Tests
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_mcp_sse_requires_auth(configured_app):
     """Test that MCP SSE endpoint requires authentication."""
     transport = ASGITransport(app=configured_app)
-    async with AsyncClient(transport=transport, base_url="http://localhost:8000") as client:
+    async with AsyncClient(
+        transport=transport, base_url="http://localhost:8000"
+    ) as client:
         response = await client.get("/mcp/sse")
 
         # Should fail without auth
@@ -235,14 +256,16 @@ async def test_mcp_sse_with_auth(configured_app):
     # Use a simple HEAD-like request to verify auth passes
     # Full SSE streaming is tested manually
     transport = ASGITransport(app=configured_app)
-    async with AsyncClient(transport=transport, base_url="http://localhost:8000", timeout=2.0) as client:
+    async with AsyncClient(
+        transport=transport, base_url="http://localhost:8000", timeout=2.0
+    ) as client:
         # Just verify auth middleware passes the request through
         # The SSE endpoint will start streaming, but we don't need to consume it
         try:
             async with client.stream(
                 "GET",
                 "/mcp/sse",
-                headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"}
+                headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"},
             ) as response:
                 # If we get here without 401, auth passed
                 assert response.status_code == 200

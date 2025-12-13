@@ -65,12 +65,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import config
-from __version__ import __version__
-from scripts.deidentify import DeidentificationConfig, deidentify_dataset
-from scripts.extract_data import extract_excel_to_jsonl
-from scripts.load_dictionary import load_study_dictionary
-from scripts.utils import logging as log
+from reportalin import __version__
+from reportalin.core import config
+from reportalin.data.deidentify import DeidentificationConfig, deidentify_dataset
+from reportalin.data.extract import extract_excel_to_jsonl
+from reportalin.data.load_dictionary import load_study_dictionary
 
 try:
     import argcomplete
@@ -94,21 +93,21 @@ def run_step(step_name: str, func: Callable[[], Any]) -> Any:
         Result from the function, or exits with code 1 on error
     """
     try:
-        log.info(f"--- {step_name} ---")
+        logging.info(f"--- {step_name} ---")
         result = func()
 
         # Check if result indicates failure
         if isinstance(result, bool) and not result:
-            log.error(f"{step_name} failed.")
+            logging.error(f"{step_name} failed.")
             sys.exit(1)
         elif isinstance(result, dict) and result.get("errors"):
-            log.error(f"{step_name} completed with {len(result['errors'])} errors.")
+            logging.error(f"{step_name} completed with {len(result['errors'])} errors.")
             sys.exit(1)
 
-        log.success(f"{step_name} completed successfully.")
+        logging.info(f"{step_name} completed successfully.")
         return result
     except Exception as e:
-        log.error(f"Error in {step_name}: {e}", exc_info=True)
+        logging.error(f"Error in {step_name}: {e}", exc_info=True)
         sys.exit(1)
 
 
@@ -203,16 +202,18 @@ For detailed documentation, see the Sphinx docs or README.md
     else:
         log_level = config.LOG_LEVEL
 
-    log.setup_logger(name=config.LOG_NAME, log_level=log_level, simple_mode=args.simple)
-    log.info("Starting RePORTaLiN-Specialist pipeline...")
+    logging.basicConfig(
+        level=log_level, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+    logging.info("Starting RePORTaLiN-Specialist pipeline...")
 
     # Validate configuration and warn about missing files
     config_warnings = config.validate_config()
     if config_warnings:
         for warning in config_warnings:
-            log.warning(warning)
+            logging.warning(warning)
         # Don't exit on warnings, just inform the user
-        log.info("Proceeding despite warnings. Some features may not work.")
+        logging.info("Proceeding despite warnings. Some features may not work.")
 
     # Ensure required directories exist
     config.ensure_directories()
@@ -231,12 +232,12 @@ For detailed documentation, see the Sphinx docs or README.md
             ),
         )
     else:
-        log.info("--- Skipping Step 0: Data Dictionary Loading ---")
+        logging.info("--- Skipping Step 0: Data Dictionary Loading ---")
 
     if not args.skip_extraction:
         run_step("Step 1: Extracting Raw Data to JSONL", extract_excel_to_jsonl)
     else:
-        log.info("--- Skipping Step 1: Data Extraction ---")
+        logging.info("--- Skipping Step 1: Data Extraction ---")
 
     # De-identification step (opt-in for now)
     if args.enable_deidentification and not args.skip_deidentification:
@@ -248,8 +249,8 @@ For detailed documentation, see the Sphinx docs or README.md
             # Output to dedicated deidentified directory within results
             output_dir = Path(config.RESULTS_DIR) / "deidentified" / config.DATASET_NAME
 
-            log.info(f"De-identifying dataset: {input_dir} -> {output_dir}")
-            log.info("Processing both 'original' and 'cleaned' subdirectories...")
+            logging.info(f"De-identifying dataset: {input_dir} -> {output_dir}")
+            logging.info("Processing both 'original' and 'cleaned' subdirectories...")
 
             # Parse countries argument
             countries = None
@@ -271,7 +272,7 @@ For detailed documentation, see the Sphinx docs or README.md
 
             # Log configuration
             country_display = countries or ["IN (default)"]
-            log.info(f"Countries: {', '.join(country_display)}")
+            logging.info(f"Countries: {', '.join(country_display)}")
 
             # Run de-identification (will process subdirectories recursively)
             stats = deidentify_dataset(
@@ -292,17 +293,19 @@ For detailed documentation, see the Sphinx docs or README.md
                 f"    - {output_dir}/original/  (de-identified original files)\n"
                 f"    - {output_dir}/cleaned/   (de-identified cleaned files)"
             )
-            log.info(completion_msg)
+            logging.info(completion_msg)
 
             return stats
 
         run_step("Step 2: De-identifying PHI/PII", run_deidentification)
     elif args.skip_deidentification:
-        log.info("--- Skipping Step 2: De-identification ---")
+        logging.info("--- Skipping Step 2: De-identification ---")
     else:
-        log.info("--- De-identification disabled (use --enable-deidentification) ---")
+        logging.info(
+            "--- De-identification disabled (use --enable-deidentification) ---"
+        )
 
-    log.info("RePORTaLiN-Specialist pipeline finished.")
+    logging.info("RePORTaLiN-Specialist pipeline finished.")
 
 
 if __name__ == "__main__":

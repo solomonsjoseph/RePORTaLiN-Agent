@@ -1,26 +1,11 @@
-#!/usr/bin/env python3
+"""Backward-compatible shim for scripts/utils package.
+
+DEPRECATED: Use reportalin.data.utils instead.
+This module re-exports symbols from reportalin.data.utils for backward compatibility.
 """
-RePORTaLiN-Specialist Utilities Package.
+from reportalin import __version__
 
-Logging and privacy compliance utilities.
-
-Modules:
-    - ``logging``: Centralized logging with custom SUCCESS level
-    - ``country_regulations``: Country-specific privacy regulations (14 countries)
-
-Usage:
-    ::
-
-        from scripts.utils import get_logger, success
-        logger = get_logger()
-        success("Processing complete!")
-"""
-
-from __future__ import annotations
-
-from __version__ import __version__
-
-from .logging import (
+from reportalin.data.utils.logging import (
     critical,
     debug,
     error,

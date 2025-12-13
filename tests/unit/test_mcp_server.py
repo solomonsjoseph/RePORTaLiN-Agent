@@ -15,9 +15,9 @@ import pytest
 from pydantic import ValidationError
 
 from server.tools import (
-    DictionarySearchInput,
-    DatasetSearchInput,
     CombinedSearchInput,
+    DatasetSearchInput,
+    DictionarySearchInput,
     get_tool_registry,
     mcp,
 )
@@ -110,7 +110,7 @@ class TestToolRegistry:
 
     def test_registry_contains_registered_tools(self) -> None:
         """Test that registry lists registered tools.
-        
+
         Tool Selection Guide:
         - combined_search: DEFAULT for ALL queries (searches ALL data sources)
         - search_data_dictionary: ONLY for variable definitions (no statistics)
@@ -181,39 +181,48 @@ class TestSecurityModel:
         # This is enforced in the tool implementations
         assert len(registry["registered_tools"]) == 4
 
-    @pytest.mark.parametrize("safe_query", [
-        "smoking",
-        "HIV",
-        "age",
-        "SEX codelist",
-        "treatment outcome",
-        "diabetes",
-        "TB diagnosis",
-    ])
+    @pytest.mark.parametrize(
+        "safe_query",
+        [
+            "smoking",
+            "HIV",
+            "age",
+            "SEX codelist",
+            "treatment outcome",
+            "diabetes",
+            "TB diagnosis",
+        ],
+    )
     def test_dictionary_accepts_safe_queries(self, safe_query: str) -> None:
         """Test that dictionary search accepts valid queries."""
         input_data = DictionarySearchInput(query=safe_query)
         assert input_data.query == safe_query
 
-    @pytest.mark.parametrize("variable", [
-        "AGE",
-        "SEX",
-        "SMOKHX",
-        "HIV_R",
-        "OUTCLIN",
-    ])
+    @pytest.mark.parametrize(
+        "variable",
+        [
+            "AGE",
+            "SEX",
+            "SMOKHX",
+            "HIV_R",
+            "OUTCLIN",
+        ],
+    )
     def test_dataset_accepts_valid_variables(self, variable: str) -> None:
         """Test that dataset search accepts valid variable names."""
         input_data = DatasetSearchInput(variable=variable)
         assert input_data.variable == variable
 
-    @pytest.mark.parametrize("concept", [
-        "smoking status",
-        "age distribution",
-        "HIV status",
-        "TB outcome",
-        "alcohol use",
-    ])
+    @pytest.mark.parametrize(
+        "concept",
+        [
+            "smoking status",
+            "age distribution",
+            "HIV status",
+            "TB outcome",
+            "alcohol use",
+        ],
+    )
     def test_combined_accepts_valid_concepts(self, concept: str) -> None:
         """Test that combined search accepts valid clinical concepts."""
         input_data = CombinedSearchInput(concept=concept)

@@ -11,7 +11,6 @@ Tests cover:
 - Log output format
 """
 
-
 from server.logger import (
     bind_context,
     clear_context,
@@ -24,6 +23,7 @@ from server.logger import (
 # =============================================================================
 # Logger Initialization Tests
 # =============================================================================
+
 
 class TestGetLogger:
     """Tests for the get_logger function."""
@@ -51,6 +51,7 @@ class TestGetLogger:
 # Request ID Tests
 # =============================================================================
 
+
 class TestRequestId:
     """Tests for request ID management."""
 
@@ -75,6 +76,7 @@ class TestRequestId:
 # =============================================================================
 # Context Binding Tests
 # =============================================================================
+
 
 class TestContextBinding:
     """Tests for log context binding."""
@@ -104,6 +106,7 @@ class TestContextBinding:
 # Configure Logging Tests
 # =============================================================================
 
+
 class TestConfigureLogging:
     """Tests for logging configuration."""
 
@@ -122,6 +125,7 @@ class TestConfigureLogging:
 # =============================================================================
 # Logger Usage Tests
 # =============================================================================
+
 
 class TestLoggerUsage:
     """Tests for logger usage patterns."""

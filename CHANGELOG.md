@@ -9,42 +9,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Enhanced MCP Tools (10 Total)**
-  - `natural_language_query` - Answer complex multi-concept questions in plain English
-  - `cohort_summary` - Comprehensive participant overview (Table 1 style)
-  - `cross_tabulation` - Analyze relationships between two categorical variables
-  - `variable_details` - Deep dive into one specific variable
-  - `data_quality_report` - Missing data and completeness analysis
-  - `multi_variable_comparison` - Side-by-side statistics for multiple variables
+- **NEW: Intelligent Query Router - `prompt_enhancer` Tool** ⭐
+  - PRIMARY entry point for all user queries
+  - **CRITICAL FEATURE:** Confirms understanding with user BEFORE executing queries
+  - Analyzes intent and automatically routes to appropriate specialized tool
+  - Uses LLM's natural prompt enhancement capabilities
+  - Two-step workflow: interpretation → confirmation → execution
 
-- **New MCP Resources (6 Total)**
+### Changed
+
+- **BREAKING: MCP Tools Refactored from 10 → 4 Tools**
+  - **Reduced tools:** 10 tools consolidated into 4 streamlined tools
+  - **New architecture:**
+    1. `prompt_enhancer` ⭐ - NEW primary entry point with confirmation flow
+    2. `combined_search` - DEFAULT for analytical queries
+    3. `search_data_dictionary` - Metadata lookup only
+    4. `search_cleaned_dataset` - Direct dataset query (deidentified only)
+  - **Removed tools:** (functionality merged into `combined_search`)
+    - ❌ `natural_language_query` - Replaced by `prompt_enhancer`
+    - ❌ `cohort_summary` - Merged into `combined_search`
+    - ❌ `cross_tabulation` - Merged into `combined_search`
+    - ❌ `variable_details` - Merged into `search_data_dictionary`
+    - ❌ `data_quality_report` - Merged into `combined_search`
+    - ❌ `multi_variable_comparison` - Merged into `combined_search`
+    - ❌ `search_original_dataset` - Privacy requirement: deidentified only
+
+- **Tools Package Refactored to Modular Architecture**
+  - **Before:** Single monolithic file (`server/tools.py` - 2,710 lines)
+  - **After:** Modular package with 9 files (`server/tools/` - ~150-680 lines each)
+  - **New structure:**
+    - `tools/__init__.py` - Package exports
+    - `tools/prompt_enhancer.py` - NEW intelligent router (~320 lines)
+    - `tools/combined_search.py` - DEFAULT analytical tool (~480 lines)
+    - `tools/search_data_dictionary.py` - Metadata lookup (~150 lines)
+    - `tools/search_cleaned_dataset.py` - Dataset statistics (~110 lines)
+    - `tools/registry.py` - FastMCP setup + 6 resources + 4 prompts (~680 lines)
+    - `tools/_models.py` - Pydantic input models (~70 lines)
+    - `tools/_loaders.py` - Data loading utilities (~200 lines)
+    - `tools/_analyzers.py` - Statistical analysis (~150 lines)
+  - **Benefits:**
+    - Single Responsibility Principle (SRP) - one file per tool
+    - Easy to find, test, and modify
+    - Improved maintainability (80% reduction in file size)
+    - Clear separation of concerns
+
+- **Privacy-First Architecture**
+  - **STRICT:** Only deidentified data accessible (no admin override)
+  - All tools enforce aggregate statistics only (no individual records)
+  - Removed access to original dataset (`search_original_dataset` deleted)
+
+- **MCP Resources (6 Total) - Maintained**
+  - `dictionary://overview` - Updated with new 4-tool architecture
+  - `dictionary://tables` - All table listings
   - `dictionary://codelists` - All codelist definitions
   - `dictionary://table/{name}` - Specific table schema
   - `dictionary://codelist/{name}` - Specific codelist values
   - `study://variables/{category}` - Variables by category
 
-- **New MCP Prompts (4 Total)**
-  - `research_question_template` - Research question guidance
-  - `data_exploration_guide` - Data exploration steps
+- **MCP Prompts (4 Total) - Updated**
+  - `research_question_template` - Updated to recommend `prompt_enhancer`
+  - `data_exploration_guide` - Updated workflow with new tools
   - `statistical_analysis_template` - Statistical analysis patterns
   - `tb_outcome_analysis` - TB outcome specific guidance
 
-### Changed
+- **Documentation Updated**
+  - README.md - New 4-tool structure with `prompt_enhancer` workflow
+  - Project structure diagram updated to show refactored `tools/` package
+  - Tool selection guide updated
+  - Privacy & security section enhanced
 
-- **Tool Selection Behavior**
-  - `combined_search` is now THE DEFAULT TOOL for ALL queries
-  - Searches through ALL data sources (dictionary + cleaned + original datasets)
-  - Use for any analytical question, counts, statistics, or distributions
-  
-- **`search_data_dictionary` Role Clarified**
-  - Now explicitly for variable definitions ONLY (no statistics)
-  - Use ONLY when asking "what variables exist?" or "what does variable X mean?"
-  - For any analytical question, use `combined_search` instead
+### Fixed
 
-- Updated SYSTEM_INSTRUCTIONS with Tool Selection Guide
-- Updated `dictionary://overview` resource with tool guidance
-- Updated all documentation (README, MCP_SERVER_SETUP, TESTING_GUIDE)
-- Updated test files to reflect 10 tools
+- Eliminated ~1,000 lines of duplicate code (Phase 4A)
+- Improved code organization following SRP and DRY principles
 
 ## [2.1.0] - 2025-12-07
 

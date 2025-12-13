@@ -28,10 +28,11 @@ from client.mcp_client import (
 # Test Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def sample_mcp_tools() -> list[types.Tool]:
     """Create sample MCP tools for testing.
-    
+
     Note: combined_search is the DEFAULT tool for all queries.
     """
     return [
@@ -41,7 +42,10 @@ def sample_mcp_tools() -> list[types.Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "concept": {"type": "string", "description": "Clinical concept to search"},
+                    "concept": {
+                        "type": "string",
+                        "description": "Clinical concept to search",
+                    },
                     "include_statistics": {"type": "boolean", "default": True},
                 },
                 "required": ["concept"],
@@ -64,6 +68,7 @@ def sample_mcp_tools() -> list[types.Tool]:
 # =============================================================================
 # Client Initialization Tests
 # =============================================================================
+
 
 class TestClientInitialization:
     """Tests for UniversalMCPClient initialization."""
@@ -97,6 +102,7 @@ class TestClientInitialization:
 # Schema Adaptation Tests
 # =============================================================================
 
+
 class TestSchemaAdaptation:
     """Tests for tool schema adaptation."""
 
@@ -112,7 +118,10 @@ class TestSchemaAdaptation:
 
         assert result["type"] == "function"
         assert result["function"]["name"] == "combined_search"
-        assert "DEFAULT" in result["function"]["description"] or "Search" in result["function"]["description"]
+        assert (
+            "DEFAULT" in result["function"]["description"]
+            or "Search" in result["function"]["description"]
+        )
         assert result["function"]["parameters"]["type"] == "object"
         assert "concept" in result["function"]["parameters"]["properties"]
         assert result["function"]["parameters"]["required"] == ["concept"]
@@ -176,6 +185,7 @@ class TestSchemaAdaptation:
 # Content Flattening Tests
 # =============================================================================
 
+
 class TestContentFlattening:
     """Tests for content block flattening."""
 
@@ -227,6 +237,7 @@ class TestContentFlattening:
 # Connection State Tests
 # =============================================================================
 
+
 class TestConnectionState:
     """Tests for connection state management."""
 
@@ -269,6 +280,7 @@ class TestConnectionState:
 # Exception Tests
 # =============================================================================
 
+
 class TestExceptions:
     """Tests for exception classes."""
 
@@ -301,11 +313,14 @@ class TestExceptions:
 # Mock Connection Tests
 # =============================================================================
 
+
 class TestMockConnection:
     """Tests using mocked SSE connection."""
 
     @pytest.mark.asyncio
-    async def test_list_tools_with_mock(self, sample_mcp_tools: list[types.Tool]) -> None:
+    async def test_list_tools_with_mock(
+        self, sample_mcp_tools: list[types.Tool]
+    ) -> None:
         """Test list_tools with mocked session."""
         client = UniversalMCPClient(
             server_url="http://localhost:8000/mcp/sse",
@@ -326,7 +341,9 @@ class TestMockConnection:
         mock_session.list_tools.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_get_tools_for_openai_with_mock(self, sample_mcp_tools: list[types.Tool]) -> None:
+    async def test_get_tools_for_openai_with_mock(
+        self, sample_mcp_tools: list[types.Tool]
+    ) -> None:
         """Test get_tools_for_openai with mocked session."""
         client = UniversalMCPClient(
             server_url="http://localhost:8000/mcp/sse",
@@ -346,7 +363,9 @@ class TestMockConnection:
         assert tools[0]["function"]["name"] == "combined_search"
 
     @pytest.mark.asyncio
-    async def test_get_tools_for_anthropic_with_mock(self, sample_mcp_tools: list[types.Tool]) -> None:
+    async def test_get_tools_for_anthropic_with_mock(
+        self, sample_mcp_tools: list[types.Tool]
+    ) -> None:
         """Test get_tools_for_anthropic with mocked session."""
         client = UniversalMCPClient(
             server_url="http://localhost:8000/mcp/sse",
@@ -377,7 +396,9 @@ class TestMockConnection:
         mock_result = MagicMock()
         mock_result.isError = False
         mock_result.content = [
-            types.TextContent(type="text", text='{"concept": "diabetes", "variables_found": 5}'),
+            types.TextContent(
+                type="text", text='{"concept": "diabetes", "variables_found": 5}'
+            ),
         ]
 
         mock_session = AsyncMock()
@@ -389,7 +410,9 @@ class TestMockConnection:
         result = await client.execute_tool("combined_search", {"concept": "diabetes"})
 
         assert "diabetes" in result or "variables_found" in result
-        mock_session.call_tool.assert_called_once_with("combined_search", {"concept": "diabetes"})
+        mock_session.call_tool.assert_called_once_with(
+            "combined_search", {"concept": "diabetes"}
+        )
 
     @pytest.mark.asyncio
     async def test_execute_tool_error_response(self) -> None:
@@ -422,6 +445,7 @@ class TestMockConnection:
 # =============================================================================
 # Cache Tests
 # =============================================================================
+
 
 class TestToolsCache:
     """Tests for tools caching."""

@@ -56,10 +56,10 @@ cp .env.example .env
 # Edit .env with your MCP_AUTH_TOKEN
 
 # Start the MCP server (HTTP/SSE mode)
-uv run uvicorn server.main:app --host 127.0.0.1 --port 8000 --reload
+uv run uvicorn reportalin.server.main:app --host 127.0.0.1 --port 8000 --reload
 
 # Or start in stdio mode (for Claude Desktop)
-MCP_TRANSPORT=stdio uv run python -m server
+MCP_TRANSPORT=stdio uv run python -m reportalin.server
 ```
 
 ### Production Deployment (with Docker)
@@ -127,6 +127,66 @@ docker compose up --build mcp-server
                     └───────────────────────────┘
 ```
 
+### Project Structure
+
+The project follows Python best practices with **src-layout** (PEP 517/518/621):
+
+```
+RePORTaLiN-Agent/
+├── src/
+│   └── reportalin/              # Main package (importable)
+│       ├── __init__.py          # Package version and exports
+│       ├── __main__.py          # CLI entry point
+│       ├── server/              # MCP server implementation
+│       │   ├── __main__.py      # Server entry point
+│       │   ├── main.py          # FastAPI application
+│       │   ├── tools/           # MCP tools package (refactored)
+│       │   │   ├── __init__.py           # Package exports
+│       │   │   ├── prompt_enhancer.py    # NEW: Intelligent router
+│       │   │   ├── combined_search.py    # DEFAULT: Analytical queries
+│       │   │   ├── search_data_dictionary.py  # Metadata lookup
+│       │   │   ├── search_cleaned_dataset.py  # Dataset statistics
+│       │   │   ├── registry.py           # FastMCP setup
+│       │   │   ├── _models.py            # Pydantic models
+│       │   │   ├── _loaders.py           # Data loading
+│       │   │   └── _analyzers.py         # Statistics
+│       │   ├── config.py        # Settings (Pydantic)
+│       │   └── auth.py          # Authentication middleware
+│       ├── client/              # MCP client library
+│       │   ├── mcp_client.py    # Universal client
+│       │   └── agent.py         # Agent implementations
+│       ├── core/                # Core utilities
+│       │   ├── config.py        # Shared configuration
+│       │   ├── logging.py       # Structured logging
+│       │   └── constants.py     # Shared constants
+│       ├── data/                # Data processing
+│       │   ├── deidentify.py    # De-identification
+│       │   └── extract_data.py  # Data extraction
+│       ├── types/               # Type definitions
+│       │   └── models.py        # Pydantic models
+│       └── cli/                 # CLI commands
+│           ├── pipeline.py      # Data pipeline CLI
+│           └── verify.py        # Verification CLI
+├── tests/                       # Test suite
+│   ├── unit/                    # Unit tests
+│   └── integration/             # Integration tests
+├── docker/                      # Docker configurations
+│   ├── Dockerfile               # Production image
+│   └── Dockerfile.secure        # Hardened image
+├── examples/                    # Usage examples
+│   ├── client/                  # Client examples
+│   └── config/                  # Configuration examples
+├── pyproject.toml              # Project metadata (PEP 621)
+├── uv.lock                     # Dependency lock file
+└── README.md                   # This file
+```
+
+**Key Features:**
+- **Namespace isolation**: Prevents import conflicts
+- **Editable installs**: `uv pip install -e .` for development
+- **Type hints**: Fully typed with mypy strict mode
+- **Entry points**: CLI commands via `pyproject.toml`
+
 ### SSE Handshake Flow
 
 1. **Client** → `GET /mcp/sse` with `Authorization: Bearer <token>`
@@ -171,31 +231,66 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 ## Available Tools
 
-The MCP server exposes 10 privacy-safe tools that LLMs can invoke. **Use `combined_search` as the default for all queries.**
+The MCP server exposes **4 privacy-safe tools** with an intelligent query router. **Use `prompt_enhancer` as the primary entry point for all queries.**
 
 ### Tool Selection Guide
 
 | Query Type | Tool to Use |
 |------------|-------------|
+| **ANY question** (recommended) | `prompt_enhancer` ⭐ |
 | Any analytical question | `combined_search` |
 | Counts, distributions, statistics | `combined_search` |
 | "How many patients have X?" | `combined_search` |
-| Complex multi-concept questions | `natural_language_query` |
-| Cohort overview / Table 1 | `cohort_summary` |
-| Variable relationships | `cross_tabulation` |
 | "What variables exist for X?" (definitions only) | `search_data_dictionary` |
+| Direct dataset query (exact variable name known) | `search_cleaned_dataset` |
 
-### Primary Tools
+### Primary Tool (NEW)
 
-#### `combined_search` (DEFAULT)
+#### `prompt_enhancer` ⭐ **RECOMMENDED ENTRY POINT**
 
-**Use this for ALL analytical queries.** Searches through ALL data sources (dictionary + cleaned + original datasets).
+**Intelligent query router with user confirmation flow.** Analyzes your question, confirms understanding, then automatically routes to the appropriate specialized tool.
+
+**CRITICAL FEATURE:** Always confirms its interpretation with you BEFORE executing queries.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `user_query` | string | Yes | ANY question in natural language (5-500 chars) |
+| `context` | object | No | Optional context from previous queries |
+| `user_confirmation` | boolean | No | Set to `true` after confirming interpretation (default: `false`) |
+
+**Example Workflow:**
+```json
+// Step 1: Submit query
+{
+  "name": "prompt_enhancer",
+  "arguments": {
+    "user_query": "How many TB patients?",
+    "user_confirmation": false
+  }
+}
+// Returns: Interpretation + confirmation request
+
+// Step 2: Confirm and execute
+{
+  "name": "prompt_enhancer",
+  "arguments": {
+    "user_query": "How many TB patients?",
+    "user_confirmation": true
+  }
+}
+// Returns: Actual results from routed tool
+```
+
+### Specialized Tools
+
+#### `combined_search` (DEFAULT for analytical queries)
+
+**Use this for ALL analytical queries.** Searches through ALL data sources (dictionary + cleaned dataset).
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `concept` | string | Yes | Clinical concept or research question (3-500 chars) |
-| `include_statistics` | boolean | No | Include aggregate stats (default: true) |
-| `include_codelists` | boolean | No | Include valid codes (default: true) |
+| `include_statistics` | boolean | No | Include aggregate stats (default: `true`) |
 
 **Example:**
 ```json
@@ -207,34 +302,6 @@ The MCP server exposes 10 privacy-safe tools that LLMs can invoke. **Use `combin
 }
 ```
 
-#### `natural_language_query`
-
-Answer complex questions in plain English with multi-variable analysis.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `question` | string | Yes | Natural language question (10-1000 chars) |
-
-#### `cohort_summary`
-
-Get comprehensive study overview (Table 1 style summary).
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `include_demographics` | boolean | No | Include demographics (default: true) |
-| `include_comorbidities` | boolean | No | Include comorbidities (default: true) |
-
-#### `cross_tabulation`
-
-Analyze relationships between two categorical variables.
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `variable1` | string | Yes | First variable name |
-| `variable2` | string | Yes | Second variable name |
-
-### Supporting Tools
-
 #### `search_data_dictionary`
 
 Search for variable definitions ONLY - **does NOT return statistics**.
@@ -244,34 +311,38 @@ For any analytical question, use `combined_search` instead.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `query` | string | Yes | Term to search for |
-| `include_codelists` | boolean | No | Include codelist values (default: true) |
+| `query` | string | Yes | Term to search for (1-200 chars) |
+| `include_codelists` | boolean | No | Include codelist values (default: `true`) |
 
 #### `search_cleaned_dataset`
 
 Direct query to cleaned (de-identified) dataset when you already know the exact variable name.
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `variable` | string | Yes | Exact variable name to query |
-| `table` | string | No | Specific table to search |
-
-#### `search_original_dataset`
-
-Fallback to original dataset when cleaned data is missing something.
+**Privacy:** This tool ONLY accesses deidentified data. Original dataset is NOT accessible.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `variable` | string | Yes | Exact variable name to query |
-| `table` | string | No | Specific table to search |
+| `table_filter` | string | No | Limit to specific table |
 
-### Additional Tools
+### Tool Architecture
 
-| Tool | Description |
-|------|-------------|
-| `variable_details` | Deep dive into one specific variable |
-| `data_quality_report` | Missing data and completeness analysis |
-| `multi_variable_comparison` | Side-by-side statistics for multiple variables |
+```
+User Query → prompt_enhancer (confirms) → Routes to appropriate tool
+                    ↓
+    ┌───────────────┼───────────────┐
+    │               │               │
+combined_search  search_data_  search_cleaned_
+(analytical)     dictionary    dataset
+                 (metadata)    (direct query)
+```
+
+### Privacy & Security
+
+- ✅ All tools return **aggregate statistics only** (no individual records)
+- ✅ K-anonymity threshold enforced (k ≥ 5)
+- ✅ Only **deidentified data** accessible (no PHI/PII)
+- ✅ Audit logging for compliance (HIPAA/DPDPA)
 
 ---
 
@@ -283,7 +354,7 @@ The `UniversalMCPClient` provides a Python interface for connecting to the MCP s
 
 ```python
 import asyncio
-from client.mcp_client import UniversalMCPClient
+from reportalin.client.mcp_client import UniversalMCPClient
 
 async def main():
     # Connect to MCP server
@@ -314,7 +385,7 @@ if __name__ == "__main__":
 
 ```python
 from openai import OpenAI
-from client.mcp_client import UniversalMCPClient
+from reportalin.client.mcp_client import UniversalMCPClient
 
 async def agent_loop():
     client = OpenAI()
@@ -356,7 +427,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "args": [
         "run",
         "--directory", "/absolute/path/to/RePORTaLiN-Agent",
-        "python", "-m", "server",
+        "python", "-m", "reportalin.server",
         "--transport", "stdio"
       ],
       "env": {
@@ -375,14 +446,11 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ### Build Options
 
 ```bash
-# Production build (uv-based, recommended)
-DOCKER_BUILDKIT=1 docker build -f Dockerfile.uv -t reportalin-mcp:latest .
-
-# Legacy build (pip-based)
-DOCKER_BUILDKIT=1 docker build -t reportalin-mcp:legacy .
+# Production build (recommended)
+DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t reportalin-mcp:latest .
 
 # Secure build with additional hardening
-DOCKER_BUILDKIT=1 docker build -f Dockerfile.secure -t reportalin-mcp:secure .
+DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile.secure -t reportalin-mcp:secure .
 ```
 
 ### Run with Docker Compose
@@ -538,7 +606,7 @@ uv sync --all-extras
 uv run pytest
 
 # With coverage
-uv run pytest --cov=server --cov=client
+uv run pytest --cov=src/reportalin --cov-report=html
 ```
 
 ### Code Quality
@@ -551,7 +619,7 @@ uv run black .
 uv run ruff check .
 
 # Type check
-uv run mypy server client
+uv run mypy src/reportalin
 ```
 
 ---

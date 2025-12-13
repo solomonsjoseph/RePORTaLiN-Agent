@@ -21,6 +21,7 @@ from server.__main__ import main, parse_args
 # Argument Parsing Tests
 # =============================================================================
 
+
 class TestParseArgs:
     """Tests for the parse_args function."""
 
@@ -59,7 +60,9 @@ class TestParseArgs:
 
     def test_combined_arguments(self) -> None:
         """Test parsing multiple arguments together."""
-        with patch.object(sys, "argv", ["server", "--host", "localhost", "--port", "8080", "--reload"]):
+        with patch.object(
+            sys, "argv", ["server", "--host", "localhost", "--port", "8080", "--reload"]
+        ):
             args = parse_args()
             assert args.host == "localhost"
             assert args.port == 8080
@@ -69,6 +72,7 @@ class TestParseArgs:
 # =============================================================================
 # Main Function Tests
 # =============================================================================
+
 
 class TestMain:
     """Tests for the main entry point function."""
@@ -87,7 +91,9 @@ class TestMain:
             assert "reportalin-mcp" in captured.err.lower()
             assert "MCP Protocol" in captured.err
 
-    def test_version_includes_protocol_version(self, capsys: pytest.CaptureFixture) -> None:
+    def test_version_includes_protocol_version(
+        self, capsys: pytest.CaptureFixture
+    ) -> None:
         """Test that --version includes the MCP protocol version."""
         with patch.object(sys, "argv", ["server", "--version"]):
             main()

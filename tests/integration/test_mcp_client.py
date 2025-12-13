@@ -35,6 +35,7 @@ SKIP_REASON = "Set MCP_INTEGRATION_TEST=1 to run live server tests"
 # Connection Tests (Mocked)
 # =============================================================================
 
+
 class TestClientConnection:
     """Tests for client connection handling."""
 
@@ -73,6 +74,7 @@ class TestClientConnection:
 # =============================================================================
 # Live Server Tests (Require Running Server)
 # =============================================================================
+
 
 @pytest.mark.skipif(not LIVE_TESTS_ENABLED, reason=SKIP_REASON)
 class TestLiveServerConnection:
@@ -153,9 +155,15 @@ class TestLiveServerConnection:
             server_url=server_url,
             auth_token=auth_token,
         ) as client:
-            result = await client.execute_tool("combined_search", {"concept": "diabetes"})
+            result = await client.execute_tool(
+                "combined_search", {"concept": "diabetes"}
+            )
 
-            assert "concept" in result.lower() or "variables" in result.lower() or "diabetes" in result.lower()
+            assert (
+                "concept" in result.lower()
+                or "variables" in result.lower()
+                or "diabetes" in result.lower()
+            )
 
     async def test_list_resources_from_live_server(
         self, server_url: str, auth_token: str
@@ -185,6 +193,7 @@ class TestLiveServerConnection:
 # =============================================================================
 # Schema Format Tests
 # =============================================================================
+
 
 class TestSchemaFormats:
     """Tests for schema format conversions."""
