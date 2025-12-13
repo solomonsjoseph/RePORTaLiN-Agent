@@ -81,8 +81,8 @@ from reportalin.server.auth import (
     require_auth,
     verify_token,
 )
-from reportalin.server.config import get_settings
-from reportalin.server.logger import configure_logging, get_logger, set_request_id
+from reportalin.core.config import get_settings
+from reportalin.core.logging import configure_logging, get_logger, set_request_id
 
 # Security middleware imports
 from reportalin.server.security.middleware import (

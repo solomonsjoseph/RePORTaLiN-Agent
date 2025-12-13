@@ -43,7 +43,6 @@ Usage:
 
 Why This Module Exists:
     - Provides a clear, discoverable entry point for the Universal Adapter
-    - Maintains backward compatibility with existing mcp_client.py imports
     - Documents the Phase 3 requirement in the 6-Phase MCP Architecture
     - Allows future expansion of the universal adapter without breaking changes
 

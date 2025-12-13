@@ -14,22 +14,22 @@ Tests cover:
 import pytest
 from pydantic import ValidationError
 
-from server.tools import (
+from reportalin.server.tools import (
     CombinedSearchInput,
-    DatasetSearchInput,
-    DictionarySearchInput,
+    SearchCleanedDatasetInput,
+    SearchDataDictionaryInput,
     get_tool_registry,
     mcp,
 )
-from shared.constants import SERVER_NAME, SERVER_VERSION
+from reportalin.core.constants import SERVER_NAME, SERVER_VERSION
 
 
-class TestDictionarySearchInput:
-    """Tests for DictionarySearchInput Pydantic model."""
+class TestSearchDataDictionaryInput:
+    """Tests for SearchDataDictionaryInput Pydantic model."""
 
     def test_valid_search_query(self) -> None:
         """Test that valid search queries are accepted."""
-        input_data = DictionarySearchInput(
+        input_data = SearchDataDictionaryInput(
             query="smoking",
         )
         assert "smoking" in input_data.query
@@ -37,7 +37,7 @@ class TestDictionarySearchInput:
 
     def test_query_with_codelist_disabled(self) -> None:
         """Test query with codelist search disabled."""
-        input_data = DictionarySearchInput(
+        input_data = SearchDataDictionaryInput(
             query="HIV",
             include_codelists=False,
         )
@@ -46,20 +46,20 @@ class TestDictionarySearchInput:
     def test_query_too_short(self) -> None:
         """Test that empty queries are rejected."""
         with pytest.raises(ValidationError):
-            DictionarySearchInput(query="")
+            SearchDataDictionaryInput(query="")
 
     def test_query_too_long(self) -> None:
         """Test that very long queries are rejected."""
         with pytest.raises(ValidationError):
-            DictionarySearchInput(query="x" * 201)
+            SearchDataDictionaryInput(query="x" * 201)
 
 
-class TestDatasetSearchInput:
-    """Tests for DatasetSearchInput Pydantic model."""
+class TestSearchCleanedDatasetInput:
+    """Tests for SearchCleanedDatasetInput Pydantic model."""
 
     def test_valid_dataset_search(self) -> None:
         """Test that valid dataset searches are accepted."""
-        input_data = DatasetSearchInput(
+        input_data = SearchCleanedDatasetInput(
             variable="AGE",
         )
         assert input_data.variable == "AGE"
@@ -67,7 +67,7 @@ class TestDatasetSearchInput:
 
     def test_search_with_table_filter(self) -> None:
         """Test search with table filter."""
-        input_data = DatasetSearchInput(
+        input_data = SearchCleanedDatasetInput(
             variable="SEX",
             table_filter="Index",
         )
@@ -115,7 +115,7 @@ class TestToolRegistry:
         - combined_search: DEFAULT for ALL queries (searches ALL data sources)
         - search_data_dictionary: ONLY for variable definitions (no statistics)
         - search_cleaned_dataset: Direct query when variable name is known
-        - search_original_dataset: Fallback to original data
+        - prompt_enhancer: Analyzes and enhances user queries
         """
         registry = get_tool_registry()
         assert "registered_tools" in registry
@@ -125,14 +125,7 @@ class TestToolRegistry:
         # Supporting tools
         assert "search_data_dictionary" in tools
         assert "search_cleaned_dataset" in tools
-        assert "search_original_dataset" in tools
-        # New tools added
-        assert "natural_language_query" in tools
-        assert "cohort_summary" in tools
-        assert "cross_tabulation" in tools
-        assert "variable_details" in tools
-        assert "data_quality_report" in tools
-        assert "multi_variable_comparison" in tools
+        assert "prompt_enhancer" in tools
 
     def test_registry_contains_data_loaded_info(self) -> None:
         """Test that registry shows data loaded statistics."""
@@ -195,7 +188,7 @@ class TestSecurityModel:
     )
     def test_dictionary_accepts_safe_queries(self, safe_query: str) -> None:
         """Test that dictionary search accepts valid queries."""
-        input_data = DictionarySearchInput(query=safe_query)
+        input_data = SearchDataDictionaryInput(query=safe_query)
         assert input_data.query == safe_query
 
     @pytest.mark.parametrize(
@@ -210,7 +203,7 @@ class TestSecurityModel:
     )
     def test_dataset_accepts_valid_variables(self, variable: str) -> None:
         """Test that dataset search accepts valid variable names."""
-        input_data = DatasetSearchInput(variable=variable)
+        input_data = SearchCleanedDatasetInput(variable=variable)
         assert input_data.variable == variable
 
     @pytest.mark.parametrize(

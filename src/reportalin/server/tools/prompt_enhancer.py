@@ -33,7 +33,7 @@ from typing import Any
 
 from mcp.server.fastmcp import Context
 
-from reportalin.server.logger import get_logger
+from reportalin.core.logging import get_logger
 from reportalin.server.tools._models import (
     CombinedSearchInput,
     PromptEnhancerInput,

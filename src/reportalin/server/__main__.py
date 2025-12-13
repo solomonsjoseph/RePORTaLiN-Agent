@@ -27,8 +27,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from reportalin.server.config import get_settings
-from reportalin.server.logger import configure_logging, get_logger
+from reportalin.core.config import get_settings
+from reportalin.core.logging import configure_logging, get_logger
 
 
 def parse_args() -> argparse.Namespace:

@@ -43,16 +43,16 @@ def configured_app(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "local")
 
     # Clear all caches
-    from server.config import get_settings
+    from reportalin.core.config import get_settings
 
     get_settings.cache_clear()
 
-    from server.auth import get_rotatable_secret
+    from reportalin.server.auth import get_rotatable_secret
 
     get_rotatable_secret.cache_clear()
 
     # Now import and return the app
-    from server.main import base_app
+    from reportalin.server.main import base_app
 
     return base_app
 
@@ -64,7 +64,7 @@ def configured_app(monkeypatch):
 
 def test_server_import():
     """Test that the server modules can be imported."""
-    from server import (
+    from reportalin.server import (
         app,
         mcp,
     )
@@ -75,7 +75,7 @@ def test_server_import():
 
 def test_settings_load():
     """Test that settings load correctly."""
-    from server.config import get_settings
+    from reportalin.core.config import get_settings
 
     settings = get_settings()
     assert settings.mcp_host is not None
@@ -96,7 +96,7 @@ async def test_tools_registered():
     - combined_search: DEFAULT for ALL queries (searches ALL data sources)
     - search_data_dictionary: ONLY for variable definitions (no statistics)
     """
-    from server.tools import mcp
+    from reportalin.server.tools import mcp
 
     tools = await mcp.list_tools()
 
@@ -134,7 +134,7 @@ async def test_tools_registered():
 @pytest.mark.asyncio
 async def test_tool_schemas():
     """Test that all tools have valid JSON schemas."""
-    from server.tools import mcp
+    from reportalin.server.tools import mcp
 
     tools = await mcp.list_tools()
 
@@ -155,8 +155,8 @@ async def test_tool_schemas():
 
 def test_tool_registry():
     """Test the tool registry utility."""
-    from server.tools import get_tool_registry
-    from shared.constants import SERVER_NAME, SERVER_VERSION
+    from reportalin.server.tools import get_tool_registry
+    from reportalin.core.constants import SERVER_NAME, SERVER_VERSION
 
     registry = get_tool_registry()
 
@@ -173,7 +173,7 @@ def test_tool_registry():
 @pytest.mark.asyncio
 async def test_health_endpoint(configured_app):
     """Test health check endpoint (no auth required)."""
-    from shared.constants import SERVER_NAME
+    from reportalin.core.constants import SERVER_NAME
 
     transport = ASGITransport(app=configured_app)
     async with AsyncClient(

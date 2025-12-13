@@ -6,7 +6,7 @@ Target Audience: Developers configuring the application
 Prerequisites: Basic understanding of environment variables
 -->
 
-> **Type**: Reference | **Updated**: 2025-12-08 | **Status**: ✅ Production Ready
+> **Type**: Reference | **Updated**: 2025-12-12 | **Status**: ✅ Production Ready
 
 **Related Documentation:**
 - [MCP Server Setup](MCP_SERVER_SETUP.md) — Server integration guide
@@ -17,12 +17,7 @@ Prerequisites: Basic understanding of environment variables
 
 ## Overview
 
-RePORTaLiN-Agent implements a **dual-layer configuration system**:
-
-| Layer | File | Purpose |
-|-------|------|---------|
-| Legacy | `config.py` | Path constants for backward compatibility |
-| Modern | `scripts/core/settings.py` | Pydantic-based type-safe configuration |
+RePORTaLiN-Agent uses Pydantic-based type-safe configuration with `reportalin.core.config`.
 
 ---
 
@@ -37,56 +32,29 @@ RePORTaLiN-Agent implements a **dual-layer configuration system**:
                   ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        CONFIGURATION LAYER                                   │
-│ ┌─────────────────────────────────┐  ┌─────────────────────────────────────┐│
-│ │       config.py (Legacy)        │  │  scripts/core/settings.py (Modern) ││
-│ │  ─────────────────────────────  │  │  ─────────────────────────────────  ││
-│ │  • Path constants               │  │  • Pydantic BaseSettings            ││
-│ │  • Dataset name detection       │  │  • Environment variable binding     ││
-│ │  • Simple string values         │  │  • Type validation & coercion       ││
-│ │  • No validation                │  │  • Nested settings groups           ││
-│ └─────────────────────────────────┘  └─────────────────────────────────────┘│
+│ ┌─────────────────────────────────────────────────────────────────────────┐ │
+│ │                  reportalin.core.config (Settings)                       │ │
+│ │  ─────────────────────────────────────────────────────────────────────  │ │
+│ │  • Pydantic BaseSettings                                                 │ │
+│ │  • Environment variable binding                                          │ │
+│ │  • Type validation & coercion                                            │ │
+│ │  • Nested settings groups                                                │ │
+│ │  • Path constants for data pipeline                                      │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
 └─────────────────┬───────────────────────────────────────────────────────────┘
                   │
                   ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         APPLICATION LAYER                                    │
-│  main.py, server/main.py, scripts/core/*.py, scripts/utils/*.py     │
+│  server/main.py, client/agent.py, data processing modules                   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Component Details
+## Configuration Module
 
-### 1. Legacy Configuration (`config.py`)
-
-**Purpose:** Backward-compatible path configuration for the data pipeline.
-
-```python
-# config.py
-ROOT_DIR = Path(__file__).parent
-DATA_DIR = ROOT_DIR / "data"
-RESULTS_DIR = ROOT_DIR / "results"
-DATASET_DIR = DATA_DIR / "dataset"
-# ... more path constants
-```
-
-**Usage:**
-```python
-import config
-
-input_file = config.DATASET_DIR / "data.xlsx"
-output_file = config.RESULTS_DIR / "output.jsonl"
-```
-
-**Features:**
-- Simple path resolution from project root
-- Auto-detection of dataset name from available files
-- No external dependencies
-
----
-
-### 2. Modern Settings (`scripts/core/settings.py`)
+### `reportalin.core.config`
 
 **Purpose:** Type-safe, environment-aware configuration using Pydantic.
 
@@ -134,7 +102,7 @@ Settings
 #### Usage
 
 ```python
-from scripts.core.settings import get_settings
+from reportalin.core.config import get_settings
 
 settings = get_settings()  # Singleton instance
 
@@ -225,8 +193,8 @@ def validate_log_level(cls, v: str) -> str:
 ### MCP Server
 
 ```python
-# server/main.py
-from scripts.core.settings import get_settings
+# reportalin/server/main.py
+from reportalin.core.config import get_settings
 
 settings = get_settings()
 
@@ -239,22 +207,21 @@ else:
 ### Encrypted Logging
 
 ```python
-# server/crypto_logger.py
-from scripts.core.settings import get_settings
+# reportalin/core/logging.py
+from reportalin.core.config import get_settings
 
 class SecureLogger:
     def __init__(self):
-        if SETTINGS_AVAILABLE:
-            settings = get_settings()
-            self.log_dir = settings.logging.encrypted_log_dir
-            self.key_rotation_days = settings.encryption.key_rotation_days
+        settings = get_settings()
+        self.log_dir = settings.logging.encrypted_log_dir
+        self.key_rotation_days = settings.encryption.key_rotation_days
 ```
 
 ### Structured Logging
 
 ```python
-# scripts/core/structured_logging.py
-from scripts.core.settings import get_settings
+# reportalin/core/logging.py
+from reportalin.core.config import get_settings
 
 def configure_logging():
     settings = get_settings()
@@ -271,14 +238,14 @@ def configure_logging():
 ```python
 # tests/conftest.py
 import pytest
-from scripts.core.settings import reset_settings
+from reportalin.core.config import get_settings
 
 @pytest.fixture(autouse=True)
 def reset_config():
     """Reset settings singleton between tests."""
-    reset_settings()
+    get_settings.cache_clear()
     yield
-    reset_settings()
+    get_settings.cache_clear()
 ```
 
 ### Environment Override in Tests
@@ -292,31 +259,6 @@ def test_strict_mode(monkeypatch):
 
 ---
 
-## Migration Guide
-
-### From config.py to settings.py
-
-**Before (Legacy):**
-```python
-import config
-output_dir = config.RESULTS_DIR
-```
-
-**After (Modern):**
-```python
-from scripts.core.settings import get_settings
-settings = get_settings()
-output_dir = settings.logging.encrypted_log_dir  # For logs
-# Or continue using config.py for path constants
-```
-
-### Recommendation
-
-- **Use `config.py`** for file paths and directory locations
-- **Use `settings.py`** for behavioral configuration (logging, security, MCP)
-
----
-
 ## Reference
 
 ### Complete `.env.example`
@@ -325,11 +267,11 @@ See [.env.example](../.env.example) for all available environment variables with
 
 ### Related Modules
 
-- `config.py` - Legacy path configuration
-- `scripts/core/settings.py` - Modern Pydantic settings
-- `shared/models.py` - MCP data models including `TransportMode`
+- `reportalin.core.config` - Configuration settings
+- `reportalin.core.logging` - Structured logging
+- `reportalin.types.models` - Data models including `TransportMode`
 
 ---
 
-**Last Updated**: 2025-12-08  
-**Document Version**: 1.1
+**Last Updated**: 2025-12-12  
+**Document Version**: 2.0

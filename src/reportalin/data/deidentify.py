@@ -74,9 +74,7 @@ __all__ = [
 
 # Optional imports
 try:
-    from cryptography.fernet import Fernet
-
-    # Import AES-256-GCM cipher for improved security
+    # Import AES-256-GCM cipher for encryption
     from reportalin.server.security.encryption import AES256GCMCipher
 
     # Import shared exceptions
@@ -92,7 +90,7 @@ except ImportError:
 from tqdm import tqdm
 
 try:
-    from reportalin.data.utils.country_regulations import CountryRegulationManager
+    from reportalin.data.regulations import CountryRegulationManager
 
     COUNTRY_REGULATIONS_AVAILABLE = True
 except ImportError:
@@ -756,20 +754,16 @@ class MappingStore:
     Secure storage for PHI to pseudonym mappings.
 
     Features:
-    - Encrypted storage using AES-256-GCM (upgraded from Fernet/AES-128-CBC)
+    - Encrypted storage using AES-256-GCM
     - Separate key management
     - JSON serialization
     - Audit logging
-    - Backward compatibility with Fernet-encrypted files
 
-    Security Upgrade (2025):
-        This class now uses AES-256-GCM for new encryptions, providing:
-        - 256-bit keys (vs Fernet's 128-bit)
+    Security:
+        This class uses AES-256-GCM for encryptions, providing:
+        - 256-bit keys
         - Authenticated encryption (detects tampering)
         - No padding oracle vulnerabilities
-
-        Existing Fernet-encrypted files are automatically detected and
-        can still be decrypted for migration purposes.
     """
 
     def __init__(
@@ -777,7 +771,6 @@ class MappingStore:
         storage_path: Path,
         encryption_key: bytes | str | None = None,
         enable_encryption: bool = True,
-        use_legacy_fernet: bool = False,
     ):
         """
         Initialize mapping store.
@@ -786,17 +779,15 @@ class MappingStore:
             storage_path: Path to store mapping file
             encryption_key: Encryption key (generates new if None).
                            For AES-256-GCM: 32 bytes or base64 string
-                           For legacy Fernet: Fernet key bytes
             enable_encryption: Whether to encrypt mappings
-            use_legacy_fernet: Force use of legacy Fernet (not recommended)
         """
         self.storage_path = Path(storage_path)
         self.enable_encryption = enable_encryption and CRYPTO_AVAILABLE
-        self._use_aes256 = AES256_AVAILABLE and not use_legacy_fernet
+        self._use_aes256 = AES256_AVAILABLE
 
         if self.enable_encryption:
             if self._use_aes256:
-                # Use new AES-256-GCM cipher
+                # Use AES-256-GCM cipher
                 if encryption_key is None:
                     self._aes_cipher = AES256GCMCipher.generate()
                     self.encryption_key = self._aes_cipher.export_key().encode()
@@ -818,19 +809,13 @@ class MappingStore:
                         raise ValueError(
                             "Invalid encryption key format. Provide 32 bytes or base64 string."
                         )
-                self._fernet_cipher = None
                 logging.info("Using AES-256-GCM encryption for mapping storage")
             else:
-                # Legacy Fernet mode
-                self.encryption_key = encryption_key or Fernet.generate_key()
-                self._fernet_cipher = Fernet(self.encryption_key)
-                self._aes_cipher = None
-                logging.warning(
-                    "Using legacy Fernet encryption. Consider upgrading to AES-256-GCM."
+                raise RuntimeError(
+                    "AES-256-GCM encryption is required but cryptography package is not available."
                 )
         else:
             self.encryption_key = None
-            self._fernet_cipher = None
             self._aes_cipher = None
             if enable_encryption:
                 logging.warning(
@@ -850,7 +835,6 @@ class MappingStore:
         Returns:
             Format identifier string:
             - 'aes256gcm': AES-256-GCM format (JSON with 'v', 'n', 'c' fields)
-            - 'fernet': Fernet format (starts with 'gAAAA')
             - 'plaintext': Unencrypted JSON
             - 'unknown': Unrecognized format
         """
@@ -859,22 +843,16 @@ class MappingStore:
             decoded = data.decode("utf-8")
             if decoded.startswith('{"v":'):
                 return "aes256gcm"
-            # Check for Fernet format (base64 starting with gAAAA)
-            if data.startswith(b"gAAAA"):
-                return "fernet"
             # Try parsing as JSON (plaintext)
             json.loads(decoded)
             return "plaintext"
         except (UnicodeDecodeError, json.JSONDecodeError):
-            # If it starts with gAAAA after decoding, it's Fernet
-            if data.startswith(b"gAAAA"):
-                return "fernet"
             return "unknown"
 
     def _load_mappings(self) -> None:
         """Load mappings from storage file.
 
-        Automatically detects encryption format (AES-256-GCM, Fernet, or plaintext)
+        Automatically detects encryption format (AES-256-GCM or plaintext)
         and decrypts accordingly. Sets self.mappings to empty dict on failure.
         """
         if not self.storage_path.exists():
@@ -893,17 +871,10 @@ class MappingStore:
             elif format_type == "aes256gcm" and self._aes_cipher:
                 # AES-256-GCM encrypted
                 decrypted_data = self._aes_cipher.decrypt(data)
-            elif format_type == "fernet" and self._fernet_cipher:
-                # Legacy Fernet encrypted
-                decrypted_data = self._fernet_cipher.decrypt(data)
-                logging.info(
-                    "Loaded Fernet-encrypted mappings. Consider re-saving to upgrade to AES-256-GCM."
-                )
             elif self.enable_encryption:
                 logging.error(
                     f"Cannot decrypt mappings: format={format_type}, "
-                    f"have_aes={self._aes_cipher is not None}, "
-                    f"have_fernet={self._fernet_cipher is not None}"
+                    f"have_aes={self._aes_cipher is not None}"
                 )
                 self.mappings = {}
                 return
@@ -934,12 +905,9 @@ class MappingStore:
             # Encrypt if enabled
             if self.enable_encryption:
                 if self._aes_cipher:
-                    # Use AES-256-GCM (preferred)
+                    # Use AES-256-GCM
                     payload = self._aes_cipher.encrypt(json_data)
                     data = payload.to_bytes()
-                elif self._fernet_cipher:
-                    # Fallback to legacy Fernet
-                    data = self._fernet_cipher.encrypt(json_data)
                 else:
                     data = json_data
             else:
@@ -964,9 +932,7 @@ class MappingStore:
         """
         return {
             "enabled": self.enable_encryption,
-            "algorithm": "AES-256-GCM"
-            if self._aes_cipher
-            else ("Fernet (AES-128-CBC)" if self._fernet_cipher else "None"),
+            "algorithm": "AES-256-GCM" if self._aes_cipher else "None",
             "key_available": self.encryption_key is not None,
             "storage_path": str(self.storage_path),
             "mappings_count": len(self.mappings),
@@ -1111,11 +1077,11 @@ class DeidentificationEngine:
         # Initialize mapping store
         if mapping_store is None:
             try:
-                import config as project_config
+                from reportalin.core.config import RESULTS_DIR
 
                 # Store mappings in the deidentified directory for better organization
                 storage_path = (
-                    Path(project_config.RESULTS_DIR)
+                    Path(RESULTS_DIR)
                     / "deidentified"
                     / "mappings"
                     / "mappings.enc"
@@ -1751,7 +1717,7 @@ def main() -> None:
     # List countries if requested
     if args.list_countries:
         if COUNTRY_REGULATIONS_AVAILABLE:
-            from reportalin.data.utils.country_regulations import (
+            from reportalin.data.regulations import (
                 get_all_supported_countries,
             )
 
@@ -1761,10 +1727,10 @@ def main() -> None:
                 print(f"  {code}: {name}")
             print("\nUsage Examples:")
             print(
-                "  python -m scripts.deidentify --countries US IN --input-dir <dir> --output-dir <dir>"
+                "  python -m reportalin.data.deidentify --countries US IN --input-dir <dir> --output-dir <dir>"
             )
             print(
-                "  python -m scripts.deidentify --countries ALL --input-dir <dir> --output-dir <dir>"
+                "  python -m reportalin.data.deidentify --countries ALL --input-dir <dir> --output-dir <dir>"
             )
         else:
             print("Country regulations module not available.")
@@ -1778,26 +1744,26 @@ def main() -> None:
         try:
             import os
 
-            import config as project_config
+            from reportalin.core.config import RESULTS_DIR, DATASET_NAME
 
             if not input_dir:
                 # Auto-detect dataset directory from config
                 input_dir = os.path.join(
-                    project_config.RESULTS_DIR, "dataset", project_config.DATASET_NAME
+                    RESULTS_DIR, "dataset", DATASET_NAME
                 )
                 print(f"Using auto-detected input directory: {input_dir}")
             if not output_dir:
                 # Use sensible default for output
                 output_dir = os.path.join(
-                    project_config.RESULTS_DIR,
+                    RESULTS_DIR,
                     "deidentified",
-                    project_config.DATASET_NAME,
+                    DATASET_NAME,
                 )
                 print(f"Using default output directory: {output_dir}")
         except (ImportError, AttributeError):
             if not input_dir or not output_dir:
                 parser.error(
-                    "--input-dir and --output-dir are required (config.py not available for auto-detection)"
+                    "--input-dir and --output-dir are required (config not available for auto-detection)"
                 )
 
     # Parse countries

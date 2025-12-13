@@ -47,8 +47,8 @@ from typing import Annotated, Any
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from reportalin.server.config import get_settings
-from reportalin.server.logger import get_logger
+from reportalin.core.config import get_settings
+from reportalin.core.logging import get_logger
 from reportalin.server.security.secrets import RotatableSecret
 
 __all__ = [

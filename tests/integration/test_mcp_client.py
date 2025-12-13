@@ -14,7 +14,7 @@ import os
 
 import pytest
 
-from client import (
+from reportalin.client import (
     MCPAuthenticationError,
     MCPConnectionError,
     UniversalMCPClient,

@@ -24,7 +24,7 @@ from typing import Any
 
 from mcp.server.fastmcp import Context
 
-from reportalin.server.logger import get_logger
+from reportalin.core.logging import get_logger
 from reportalin.server.tools._loaders import get_codelists, get_data_dictionary
 from reportalin.server.tools._models import SearchDataDictionaryInput
 

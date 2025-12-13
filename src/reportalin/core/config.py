@@ -59,7 +59,7 @@ from reportalin.core.constants import (
 )
 
 # =============================================================================
-# Data Pipeline Path Constants (for backward compatibility)
+# Data Pipeline Path Constants
 # =============================================================================
 # These constants are used by the data extraction and de-identification modules
 

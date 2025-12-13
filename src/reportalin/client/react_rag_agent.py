@@ -945,9 +945,6 @@ class ReActRAGAgent:
             "list_datasets": self._list_datasets,
             "describe_dataset": self._describe_dataset,
             "get_study_overview": self._get_study_overview,
-            # Legacy aliases
-            "search_dictionary": self._search_variables,
-            "explore_metadata": self._list_datasets,
         }
 
         if name in local_tools:

@@ -128,18 +128,21 @@ CRITICAL (50) → Fatal errors (console + file)
 
 **Public API:**
 ```python
-from scripts.utils import logging as log
+from reportalin.data.utils.logging import (
+    setup_logger,
+    get_logger,
+    debug, info, warning, error, critical, success,
+)
 
-log.setup_logger(name, log_level, simple_mode)
-log.get_logger(name)
-log.debug(msg), log.info(msg), log.warning(msg)
-log.error(msg), log.critical(msg), log.success(msg)
-log.get_verbose_logger()  # Returns VerboseLogger instance
+setup_logger(name, log_level, simple_mode)
+get_logger(name)
+debug(msg), info(msg), warning(msg)
+error(msg), critical(msg), success(msg)
 ```
 
 ---
 
-### 2. Structured Logging (`scripts/core/structured_logging.py`)
+### 2. Structured Logging (`reportalin.core.logging`)
 
 **Purpose:** JSON-formatted logging with automatic PHI redaction and request-scoped context.
 
@@ -163,29 +166,28 @@ PHI_PATTERNS = frozenset({
 
 **Public API:**
 ```python
-from scripts.core.structured_logging import (
-    get_structured_logger,
-    log_context,
+from reportalin.core.logging import (
+    get_logger,
+    bind_context,
     configure_logging,
-    PHI_PATTERNS,
 )
 
-logger = get_structured_logger(__name__)
+logger = get_logger(__name__)
 logger.info("Query executed", query_type="aggregate", row_count=100)
 
-with log_context(request_id="req-123", user="analyst"):
+with bind_context(request_id="req-123", user="analyst"):
     logger.info("Processing")  # Includes request_id and user
 ```
 
 ---
 
-### 3. Encrypted Logging (`server/crypto_logger.py`)
+### 3. Encrypted Logging (`reportalin.server.security`)
 
 **Purpose:** Secure logging for sensitive MCP operations with hybrid RSA/AES encryption.
 
 | Feature | Description |
 |---------|-------------|
-| **Hybrid Encryption** | AES-256-CBC for content, RSA-OAEP for key |
+| **Hybrid Encryption** | AES-256-GCM for content, RSA-OAEP for key |
 | **PHI Auto-Redaction** | Pre-encryption sanitization |
 | **Key Rotation** | Tracks key age, warns at 90 days (NIST guideline) |
 | **Audit Metadata** | Key fingerprint, timestamp, service name |
@@ -257,18 +259,18 @@ python -m scripts.core.log_decryptor encrypted_logs/log_xxx.enc
 python -m scripts.core.log_decryptor encrypted_logs/ --level ERROR --since "1 day ago"
 
 # Export to JSON (PHI redacted)
-python -m scripts.core.log_decryptor encrypted_logs/ --output decrypted.json
+python -m reportalin.core.log_decryptor encrypted_logs/ --output decrypted.json
 
 # Show PHI (requires explicit flag)
-python -m scripts.core.log_decryptor encrypted_logs/ --show-phi
+python -m reportalin.core.log_decryptor encrypted_logs/ --show-phi
 
 # Generate new keypair
-python -m scripts.core.log_decryptor --generate-keys
+python -m reportalin.core.log_decryptor --generate-keys
 ```
 
 **Public API:**
 ```python
-from scripts.core.log_decryptor import (
+from reportalin.core.log_decryptor import (
     LogDecryptor,
     generate_keypair,
     DecryptionError,
@@ -287,7 +289,7 @@ entries = decryptor.decrypt_directory("encrypted_logs/", level="ERROR")
 
 | Area | Implementation |
 |------|----------------|
-| **Encryption** | RSA-OAEP (2048+ bit) + AES-256-CBC hybrid |
+| **Encryption** | RSA-OAEP (2048+ bit) + AES-256-GCM hybrid |
 | **Key Management** | 90-day rotation warnings, fingerprint-based auth |
 | **PHI Protection** | Multi-layer redaction (pre-encrypt + post-decrypt) |
 | **Audit Trail** | Key fingerprint, timestamps in encrypted logs |
@@ -307,35 +309,35 @@ entries = decryptor.decrypt_directory("encrypted_logs/", level="ERROR")
 
 ## Integration Points
 
-### MCP Server (`server/main.py`)
+### MCP Server (`reportalin/server/main.py`)
 
 ```python
-from server.crypto_logger import get_secure_logger
+from reportalin.core.logging import get_logger
 
-secure_logger = get_secure_logger()
+logger = get_logger(__name__)
 
 async def handle_tool_call(name: str, arguments: dict):
     try:
         result = await execute_tool(name, arguments)
-        secure_logger.log_info(f"Tool executed: {name}", {"args": arguments})
+        logger.info(f"Tool executed: {name}", extra={"args": arguments})
         return result
     except Exception as e:
-        secure_logger.log_error(f"Tool failed: {name}", {"args": arguments}, e)
+        logger.error(f"Tool failed: {name}", extra={"args": arguments}, exc_info=e)
         raise
 ```
 
 ### Pipeline Modules
 
 ```python
-from scripts.utils import logging as log
-from scripts.core.structured_logging import get_structured_logger, log_context
+from reportalin.data.utils.logging import info, success
+from reportalin.core.logging import get_logger, bind_context
 
 # Standard logging
-log.info("Processing started")
-log.success("Processing complete")
+info("Processing started")
+success("Processing complete")
 
 # Structured logging with context
-logger = get_structured_logger(__name__)
+logger = get_logger(__name__)
 with log_context(batch_id="batch-001", user="analyst"):
     logger.info("Processing batch", record_count=1000)
 ```

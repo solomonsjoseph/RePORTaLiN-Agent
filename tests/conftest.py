@@ -88,14 +88,14 @@ def reset_caches():
     """
     # Import and clear caches BEFORE test runs
     try:
-        from server.config import get_settings
+        from reportalin.core.config import get_settings
 
         get_settings.cache_clear()
     except ImportError:
         pass
 
     try:
-        from server.auth import get_rotatable_secret
+        from reportalin.server.auth import get_rotatable_secret
 
         get_rotatable_secret.cache_clear()
     except ImportError:
@@ -105,14 +105,14 @@ def reset_caches():
 
     # Clear caches AFTER test as well (cleanup)
     try:
-        from server.config import get_settings
+        from reportalin.core.config import get_settings
 
         get_settings.cache_clear()
     except ImportError:
         pass
 
     try:
-        from server.auth import get_rotatable_secret
+        from reportalin.server.auth import get_rotatable_secret
 
         get_rotatable_secret.cache_clear()
     except ImportError:
@@ -192,7 +192,7 @@ def app_settings(monkeypatch_module):
     monkeypatch_module.setenv("LOG_LEVEL", "DEBUG")
 
     # Clear the settings cache to pick up new values
-    from server.config import get_settings
+    from reportalin.core.config import get_settings
 
     get_settings.cache_clear()
 
@@ -221,9 +221,9 @@ def mcp_instance(app_settings):
     Get the MCP server instance.
 
     Returns:
-        FastMCP instance from server.tools
+        FastMCP instance from reportalin.server.tools
     """
-    from server.tools import mcp
+    from reportalin.server.tools import mcp
 
     return mcp
 
@@ -257,13 +257,13 @@ def test_app(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "local")
 
     # Clear settings cache to pick up new env vars
-    from server.config import get_settings
+    from reportalin.core.config import get_settings
 
     get_settings.cache_clear()
 
     # CRITICAL: Also clear the rotatable secret cache so it picks up the new token
     # Without this, the auth system may use a stale "unconfigured" state
-    from server.auth import get_rotatable_secret
+    from reportalin.server.auth import get_rotatable_secret
 
     get_rotatable_secret.cache_clear()
 
@@ -271,7 +271,7 @@ def test_app(monkeypatch):
     _ = get_settings()
 
     # Use global app (routes are registered at module load time)
-    from server.main import base_app
+    from reportalin.server.main import base_app
 
     return base_app
 
@@ -454,47 +454,6 @@ def build_technical_request_input():
         "variables_of_interest": ["Age", "Sex", "TB_Status"],
         "time_points": ["Baseline", "Month 6"],
         "output_format": "concept_sheet",
-    }
-
-
-# Legacy fixtures kept for backwards compatibility during transition
-@pytest.fixture
-def query_database_input():
-    """
-    DEPRECATED: Old fixture kept for reference.
-    Use explore_study_metadata_input or build_technical_request_input instead.
-    """
-    return {
-        "query": "SELECT * FROM patients WHERE age > 18",
-        "limit": 100,
-        "include_metadata": False,
-    }
-
-
-@pytest.fixture
-def search_dictionary_input():
-    """
-    DEPRECATED: Old fixture kept for reference.
-    Use explore_study_metadata_input instead.
-    """
-    return {
-        "search_term": "patient_id",
-        "table_filter": None,
-        "include_values": True,
-    }
-
-
-@pytest.fixture
-def fetch_metrics_input():
-    """
-    DEPRECATED: Old fixture kept for reference.
-    Use explore_study_metadata_input instead.
-    """
-    return {
-        "metric_type": "count",
-        "field_name": "patients",
-        "group_by": None,
-        "filters": None,
     }
 
 

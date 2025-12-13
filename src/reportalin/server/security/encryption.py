@@ -54,7 +54,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-# Import shared exceptions (maintains backward compatibility via re-export)
+# Import shared exceptions
 from reportalin.core.exceptions import DecryptionError, EncryptionError
 
 __all__ = [

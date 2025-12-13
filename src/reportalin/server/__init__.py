@@ -30,7 +30,7 @@ Example:
     >>> logger.info("Server initialized", port=settings.mcp_port)
 
     # Or run the server directly:
-    >>> from server import run_server
+    >>> from reportalin.server import run_server
     >>> run_server(host="0.0.0.0", port=8000)
 """
 
@@ -41,14 +41,14 @@ from reportalin.server.auth import (
     require_auth,
     verify_token,
 )
-from reportalin.server.config import (
+from reportalin.core.config import (
     Environment,
     LogLevel,
     Settings,
     get_project_root,
     get_settings,
 )
-from reportalin.server.logger import (
+from reportalin.core.logging import (
     bind_context,
     clear_context,
     configure_logging,

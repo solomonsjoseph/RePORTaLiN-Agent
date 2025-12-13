@@ -410,7 +410,3 @@ class InMemoryRateLimiter(RateLimiter):
                     "whitelist_size": len(self.config.whitelist),
                 },
             }
-
-
-# Alias for backward compatibility
-SlidingWindowLimiter = InMemoryRateLimiter

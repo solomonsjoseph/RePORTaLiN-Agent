@@ -22,7 +22,7 @@ from typing import Any
 
 from mcp.server.fastmcp import Context
 
-from reportalin.server.logger import get_logger
+from reportalin.core.logging import get_logger
 from reportalin.server.tools._analyzers import compute_variable_stats
 from reportalin.server.tools._loaders import (
     get_cleaned_dataset,

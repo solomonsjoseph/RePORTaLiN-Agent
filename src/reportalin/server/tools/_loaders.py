@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from reportalin.server.logger import get_logger
+from reportalin.core.logging import get_logger
 
 __all__ = [
     "DATA_DICTIONARY_PATH",
