@@ -17,11 +17,12 @@ Be respectful, inclusive, and constructive in all interactions.
 # Install uv (if not already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install all dependencies (recommended)
-uv sync --all-extras
+# Install all dependencies including dev tools (recommended)
+make install-dev
 
-# Or install dev dependencies only
-uv sync --dev
+# This automatically:
+# - Installs all dependencies via uv sync --all-extras
+# - Sets up pre-commit hooks for automatic linting on commit
 ```
 
 ## Development Workflow
@@ -31,6 +32,7 @@ uv sync --dev
 1. Pull the latest changes from `main`
 2. Create a feature branch with a descriptive name
 3. Review existing code patterns in similar files
+4. Ensure pre-commit hooks are installed: `uv run pre-commit install`
 
 ### Code Standards
 

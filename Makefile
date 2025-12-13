@@ -289,6 +289,9 @@ install-dev:
 	@printf "$(BLUE)Installing development dependencies...$(NC)\n"
 	@uv sync --all-extras
 	@printf "$(GREEN)✓ Development dependencies installed$(NC)\n"
+	@printf "$(BLUE)Installing pre-commit hooks...$(NC)\n"
+	@uv run pre-commit install
+	@printf "$(GREEN)✓ Pre-commit hooks installed$(NC)\n"
 
 upgrade-deps:
 	@printf "$(BLUE)Upgrading all dependencies...$(NC)\n"
